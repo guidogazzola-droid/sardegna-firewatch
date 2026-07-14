@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: sardegna-firewatch
+    runtime: node
+    plan: starter
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: CACHE_TTL_MS
+        value: "300000"
+      - key: FIRMS_MAP_KEY
+        sync: false
