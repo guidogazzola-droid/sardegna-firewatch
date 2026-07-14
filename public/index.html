@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta
+      name="description"
+      content="Dashboard cartografica per il monitoraggio quasi in tempo reale di incendi, anomalie termiche e pericolo incendio in Sardegna."
+    />
+    <meta name="theme-color" content="#101719" />
+    <title>Sardegna FireWatch</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="stylesheet" href="/vendor/leaflet/leaflet.css" />
+    <link rel="stylesheet" href="/vendor/leaflet-markercluster/MarkerCluster.css" />
+    <link rel="stylesheet" href="/vendor/leaflet-markercluster/MarkerCluster.Default.css" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#map">Vai alla mappa</a>
+
+    <header class="topbar">
+      <div class="brand" aria-label="Sardegna FireWatch">
+        <div class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 48 48" role="img">
+            <path d="M26.9 4.5c1.9 8.6-6.4 11-2.1 18.7 1.5-4.5 5.9-6.8 6.2-12.3 6.7 6 10.1 12.2 8.9 18.4C38.4 37 31.8 43 23.8 43 14.5 43 7 35.6 7 26.4c0-6.7 4-12.7 10.4-17.7-.5 6.5 1.3 10.1 4.9 11.7C20.5 14.4 24.6 9.2 26.9 4.5Z" />
+            <path class="brand-mark-inner" d="M24.3 24.1c4.9 4.3 6.2 7.3 5.5 10.1-.7 3.1-3.2 5.4-6.4 5.4-3.7 0-6.7-2.9-6.7-6.5 0-2.8 1.7-5.5 4.5-8.1-.1 2.7.7 4.2 2.3 4.9-.8-2.5-.2-4.2.8-5.8Z" />
+          </svg>
+        </div>
+        <div>
+          <div class="brand-name">Sardegna FireWatch</div>
+          <div class="brand-subtitle">Monitoraggio satellitare quasi in tempo reale</div>
+        </div>
+      </div>
+
+      <div class="topbar-actions">
+        <div id="feedStatus" class="status-pill status-loading" role="status" aria-live="polite">
+          <span class="status-dot"></span>
+          <span id="feedStatusText">Connessione alle sorgenti...</span>
+        </div>
+        <button id="refreshButton" class="icon-button" type="button" aria-label="Aggiorna i dati" title="Aggiorna i dati">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M20 11a8.1 8.1 0 0 0-14.9-4M4 4v5h5M4 13a8.1 8.1 0 0 0 14.9 4M20 20v-5h-5" />
+          </svg>
+        </button>
+        <button id="sidebarToggle" class="icon-button mobile-only" type="button" aria-label="Apri o chiudi il pannello">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
+        </button>
+      </div>
+    </header>
+
+    <div id="systemBanner" class="system-banner" hidden>
+      <div class="system-banner-icon" aria-hidden="true">i</div>
+      <p id="systemBannerText"></p>
+      <button id="systemBannerClose" type="button" aria-label="Chiudi avviso">×</button>
+    </div>
+
+    <main class="app-shell">
+      <aside id="sidebar" class="sidebar" aria-label="Pannello di monitoraggio">
+        <section class="panel panel-hero">
+          <div class="eyebrow">Situazione operativa</div>
+          <h1>Incendi e anomalie termiche in Sardegna</h1>
+          <p>
+            Hotspot satellitari, aree bruciate recenti e indice meteorologico di pericolo incendio in un'unica mappa.
+          </p>
+          <div class="update-row">
+            <div>
+              <span class="meta-label">Ultimo aggiornamento</span>
+              <strong id="lastRefresh">In attesa</strong>
+            </div>
+            <div>
+              <span class="meta-label">Prossimo controllo</span>
+              <strong id="nextRefresh">--:--</strong>
+            </div>
+          </div>
+        </section>
+
+        <section class="stats-grid" aria-label="Indicatori principali">
+          <article class="stat-card">
+            <span class="stat-kicker">Rilevamenti</span>
+            <strong id="statTotal">—</strong>
+            <span id="statTotalNote">Feed puntuale FIRMS</span>
+          </article>
+          <article class="stat-card">
+            <span class="stat-kicker">Prioritari</span>
+            <strong id="statUrgent">—</strong>
+            <span>Alta affidabilità o FRP elevata</span>
+          </article>
+          <article class="stat-card">
+            <span class="stat-kicker">Ultimo passaggio</span>
+            <strong id="statLatest">—</strong>
+            <span id="statLatestNote">Ora locale</span>
+          </article>
+          <article class="stat-card">
+            <span class="stat-kicker">FRP massimo</span>
+            <strong id="statFrp">—</strong>
+            <span>Potenza radiativa, MW</span>
+          </article>
+        </section>
+
+        <section class="panel controls-panel">
+          <div class="section-heading">
+            <div>
+              <span class="eyebrow">Filtri</span>
+              <h2>Feed puntuale</h2>
+            </div>
+            <span id="visibleCount" class="count-badge">0 visibili</span>
+          </div>
+
+          <label class="field-label" for="sourceSelect">Sensori NASA FIRMS</label>
+          <div class="select-shell">
+            <select id="sourceSelect">
+              <option value="viirs">VIIRS 375 m · consigliato</option>
+              <option value="all">VIIRS + MODIS</option>
+              <option value="modis">Solo MODIS 1 km</option>
+            </select>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5" /></svg>
+          </div>
+
+          <span class="field-label">Intervallo temporale</span>
+          <div class="segmented-control" role="group" aria-label="Intervallo temporale">
+            <button class="period-button active" type="button" data-days="1">24 ore</button>
+            <button class="period-button" type="button" data-days="2">48 ore</button>
+            <button class="period-button" type="button" data-days="5">5 giorni</button>
+          </div>
+
+          <span class="field-label">Affidabilità</span>
+          <div class="toggle-row">
+            <label class="confidence-toggle confidence-high">
+              <input type="checkbox" value="high" checked />
+              <span class="toggle-dot"></span>
+              Alta
+            </label>
+            <label class="confidence-toggle confidence-nominal">
+              <input type="checkbox" value="nominal" checked />
+              <span class="toggle-dot"></span>
+              Nominale
+            </label>
+            <label class="confidence-toggle confidence-low">
+              <input type="checkbox" value="low" />
+              <span class="toggle-dot"></span>
+              Bassa
+            </label>
+          </div>
+        </section>
+
+        <section class="panel timeline-panel">
+          <div class="section-heading compact">
+            <div>
+              <span class="eyebrow">Andamento</span>
+              <h2>Rilevamenti nel tempo</h2>
+            </div>
+          </div>
+          <div id="timelineChart" class="timeline-chart" aria-label="Distribuzione temporale dei rilevamenti"></div>
+          <div class="timeline-axis"><span id="timelineStart">−24 h</span><span>adesso</span></div>
+        </section>
+
+        <section class="panel watch-panel">
+          <div class="section-heading compact">
+            <div>
+              <span class="eyebrow">Sorveglianza</span>
+              <h2>Area personale</h2>
+            </div>
+            <span id="watchCount" class="count-badge neutral">Non impostata</span>
+          </div>
+          <p class="panel-copy">
+            Definisci un punto e ricevi un avviso del browser quando compare un nuovo rilevamento nel raggio scelto.
+          </p>
+
+          <div class="radius-row">
+            <label for="radiusInput">Raggio</label>
+            <output id="radiusOutput" for="radiusInput">30 km</output>
+          </div>
+          <input id="radiusInput" class="range-input" type="range" min="5" max="100" step="5" value="30" />
+
+          <div class="button-grid">
+            <button id="useLocationButton" class="secondary-button" type="button">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s6-5.3 6-11a6 6 0 1 0-12 0c0 5.7 6 11 6 11Z" /><circle cx="12" cy="10" r="2" /></svg>
+              La mia posizione
+            </button>
+            <button id="pickOnMapButton" class="secondary-button" type="button">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3V6Z" /><path d="M9 3v15M15 6v15" /></svg>
+              Scegli sulla mappa
+            </button>
+          </div>
+          <div id="watchStatus" class="watch-status">Nessuna area di sorveglianza configurata.</div>
+          <div class="watch-actions">
+            <button id="notificationButton" class="primary-button" type="button">Attiva notifiche</button>
+            <button id="clearWatchButton" class="text-button" type="button" disabled>Rimuovi area</button>
+          </div>
+          <p class="microcopy">Le notifiche funzionano mentre il sito è aperto. Non sostituiscono gli allarmi ufficiali.</p>
+        </section>
+
+        <section class="panel detections-panel">
+          <div class="section-heading compact">
+            <div>
+              <span class="eyebrow">Cronologia</span>
+              <h2>Ultimi rilevamenti</h2>
+            </div>
+          </div>
+          <div id="detectionsList" class="detections-list">
+            <div class="empty-state">
+              <div class="empty-state-icon">⌁</div>
+              <strong>In attesa del feed</strong>
+              <span>I rilevamenti interattivi appariranno qui.</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel sources-panel">
+          <span class="eyebrow">Fonti ufficiali</span>
+          <h2>Approfondimenti</h2>
+          <div class="source-links">
+            <a href="https://forest-fire.emergency.copernicus.eu/apps/effis_current_situation/" target="_blank" rel="noopener noreferrer">
+              <span><strong>Copernicus EFFIS</strong><small>Situazione incendi europea</small></span>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9" /></svg>
+            </a>
+            <a href="https://firms.modaps.eosdis.nasa.gov/map/" target="_blank" rel="noopener noreferrer">
+              <span><strong>NASA FIRMS</strong><small>Mappa globale delle anomalie termiche</small></span>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9" /></svg>
+            </a>
+            <a href="https://www.sardegnaambiente.it/index.php?c=7093&s=20&v=9&xsl=2273" target="_blank" rel="noopener noreferrer">
+              <span><strong>Bollettino regionale</strong><small>Pericolo incendio della Protezione Civile</small></span>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9" /></svg>
+            </a>
+            <a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer">
+              <span><strong>Open-Meteo</strong><small>Condizioni meteorologiche locali</small></span>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9" /></svg>
+            </a>
+          </div>
+        </section>
+
+        <section class="disclaimer-card">
+          <strong>Limiti del sistema</strong>
+          <p>
+            Un hotspot è un'anomalia termica osservata dal satellite: può essere un incendio, ma anche una fonte di calore non boschiva. Nuvole, fumo, orari di passaggio e risoluzione dei sensori possono ritardare o impedire il rilevamento.
+          </p>
+        </section>
+      </aside>
+
+      <section class="map-workspace" aria-label="Mappa degli incendi">
+        <div id="map" tabindex="0" aria-label="Mappa interattiva della Sardegna"></div>
+
+        <div class="map-top-left">
+          <div class="map-title-card">
+            <span class="live-indicator"><i></i> NRT</span>
+            <div>
+              <strong id="mapHeadline">Hotspot EFFIS · ultime 24–48 ore</strong>
+              <span id="mapSubheadline">VIIRS visibile; usa il controllo livelli per rischio e aree bruciate</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="map-bottom-left">
+          <div class="legend-card" id="mapLegend">
+            <div class="legend-title">Punti FIRMS</div>
+            <div class="legend-row"><i class="legend-dot critical"></i><span>Priorità molto alta</span></div>
+            <div class="legend-row"><i class="legend-dot high"></i><span>Alta</span></div>
+            <div class="legend-row"><i class="legend-dot medium"></i><span>Nominale</span></div>
+            <div class="legend-row"><i class="legend-dot low"></i><span>Bassa</span></div>
+            <div class="legend-note">I layer EFFIS hanno simbologia propria.</div>
+          </div>
+        </div>
+
+        <div class="map-bottom-right">
+          <button id="fitSardiniaButton" class="map-action-button" type="button" title="Inquadra la Sardegna" aria-label="Inquadra la Sardegna">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5" /></svg>
+          </button>
+        </div>
+
+        <div id="pickHint" class="pick-hint" hidden>
+          <span>Clicca sulla mappa per impostare il centro dell'area sorvegliata</span>
+          <button id="cancelPickButton" type="button">Annulla</button>
+        </div>
+      </section>
+    </main>
+
+    <footer class="emergency-bar">
+      <div class="emergency-message">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2.7 19h18.6L12 3Z" /><path d="M12 9v4M12 16.5h.01" /></svg>
+        <div>
+          <strong>Vedi fumo o fiamme?</strong>
+          <span>Non aspettare la conferma satellitare: comunica posizione, direzione del fumo e riferimenti visibili.</span>
+        </div>
+      </div>
+      <div class="emergency-numbers">
+        <a href="tel:1515"><span>Corpo Forestale</span><strong>1515</strong></a>
+        <a href="tel:112"><span>Emergenze</span><strong>112</strong></a>
+      </div>
+    </footer>
+
+    <div id="toastContainer" class="toast-container" aria-live="polite" aria-atomic="true"></div>
+
+    <template id="detectionItemTemplate">
+      <button class="detection-item" type="button">
+        <span class="detection-severity"></span>
+        <span class="detection-main">
+          <strong class="detection-zone"></strong>
+          <span class="detection-meta"></span>
+        </span>
+        <span class="detection-time"></span>
+      </button>
+    </template>
+
+    <script src="/vendor/leaflet/leaflet.js"></script>
+    <script src="/vendor/leaflet-markercluster/leaflet.markercluster.js"></script>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

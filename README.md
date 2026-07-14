@@ -71,7 +71,7 @@ L'applicazione sara disponibile su `http://localhost:3000`.
 Il progetto funziona su qualsiasi hosting che esegua un servizio Node.js persistente, per esempio un VPS, Render, Railway, Fly.io o un container gestito. Impostare:
 
 ```text
-Build command: npm install
+Build command: npm ci --registry=https://registry.npmjs.org/ --no-audit --no-fund
 Start command: npm start
 Health check: /api/health
 ```

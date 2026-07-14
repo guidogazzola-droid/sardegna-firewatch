@@ -3,7 +3,7 @@ services:
     name: sardegna-firewatch
     runtime: node
     plan: starter
-    buildCommand: npm ci
+    buildCommand: npm ci --registry=https://registry.npmjs.org/ --no-audit --no-fund
     startCommand: npm start
     healthCheckPath: /api/health
     envVars:
