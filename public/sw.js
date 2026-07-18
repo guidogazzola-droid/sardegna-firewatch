@@ -1,4 +1,4 @@
-const CACHE_NAME = "sardegna-firewatch-v1";
+const CACHE_NAME = "sardegna-firewatch-v2";
 const APP_SHELL = ["/", "/styles.css", "/app.js", "/favicon.svg", "/manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {

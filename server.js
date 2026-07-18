@@ -12,6 +12,7 @@ import {
   SARDINIA_BBOX,
 } from "./lib/config.js";
 import { fetchFirmsFires } from "./lib/firms.js";
+import { fetchWindHistory } from "./lib/wind.js";
 
 dotenv.config();
 
@@ -52,6 +53,7 @@ app.get("/api/status", (_request, response) => {
       effis: true,
       firms: Boolean(firmsMapKey),
       weather: true,
+      windHistory: true,
     },
   });
 });
@@ -165,6 +167,44 @@ app.get("/api/weather", async (request, response) => {
   } catch (error) {
     console.error("Weather request failed:", error);
     return response.status(502).json({ ok: false, error: "Meteo locale temporaneamente non disponibile." });
+  }
+});
+
+app.get("/api/wind-history", async (request, response) => {
+  response.set("Cache-Control", "no-store");
+  const latitude = Number.parseFloat(String(request.query.lat || ""));
+  const longitude = Number.parseFloat(String(request.query.lon || ""));
+  const startAt = String(request.query.start || "").trim();
+
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || Number.isNaN(new Date(startAt).getTime())) {
+    return response.status(400).json({ ok: false, error: "Coordinate o data iniziale non valide." });
+  }
+
+  const insideExtendedBox =
+    latitude >= SARDINIA_BBOX.south - 0.5 &&
+    latitude <= SARDINIA_BBOX.north + 0.5 &&
+    longitude >= SARDINIA_BBOX.west - 0.5 &&
+    longitude <= SARDINIA_BBOX.east + 0.5;
+  if (!insideExtendedBox) {
+    return response.status(400).json({ ok: false, error: "Coordinate fuori dall'area supportata." });
+  }
+
+  const cacheKey = `wind:${latitude.toFixed(2)}:${longitude.toFixed(2)}:${startAt.slice(0, 13)}`;
+  const cached = cache.get(cacheKey);
+  if (cached) return response.json({ ...cached, cached: true });
+
+  try {
+    const wind = await fetchWindHistory({ latitude, longitude, startAt });
+    const payload = { ok: true, generatedAt: new Date().toISOString(), ...wind };
+    cache.set(cacheKey, payload, 20 * 60_000);
+    return response.json({ ...payload, cached: false });
+  } catch (error) {
+    console.error("Wind history request failed:", error);
+    return response.status(502).json({
+      ok: false,
+      error: "Storico del vento temporaneamente non disponibile.",
+      details: process.env.NODE_ENV === "development" ? error.message : undefined,
+    });
   }
 });
 

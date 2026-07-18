@@ -17,6 +17,8 @@ Il progetto usa due livelli di servizio:
 - feed puntuale NASA FIRMS facoltativo, filtrabile per intervallo e affidabilita;
 - classificazione visuale della priorita basata su confidenza e Fire Radiative Power;
 - meteo locale per ogni rilevamento tramite Open-Meteo;
+- storico orario del vento dal primo rilevamento satellitare disponibile fino alla consultazione;
+- direzione prevalente sottovento e traiettoria indicativa del fumo visualizzata sulla mappa;
 - area personale con raggio da 5 a 100 km;
 - notifiche browser per nuovi hotspot vicini, mentre la pagina e aperta;
 - aggiornamento automatico, cache server e tolleranza al guasto di una singola sorgente;
@@ -84,6 +86,7 @@ Aggiungere `FIRMS_MAP_KEY` come variabile segreta nell'ambiente di hosting. Per 
 - `GET /api/status` — modalita e sorgenti abilitate;
 - `GET /api/fires?days=1&sources=viirs` — rilevamenti normalizzati;
 - `GET /api/weather?lat=40.0&lon=9.0` — meteo locale per un punto.
+- `GET /api/wind-history?lat=40.0&lon=9.0&start=2026-07-18T10:00:00Z` — storico del vento e direzione indicativa del fumo.
 
 Valori ammessi per `sources`: `viirs`, `modis`, `all`. L'intervallo `days` e limitato a 1-5 giorni.
 
@@ -93,7 +96,7 @@ Valori ammessi per `sources`: `viirs`, `modis`, `all`. L'intervallo `days` e lim
 npm test
 ```
 
-I test coprono parsing CSV, normalizzazione della confidenza, orari UTC, classificazione della priorita, limiti geografici e aggregazioni.
+I test coprono parsing CSV, normalizzazione della confidenza, orari UTC, classificazione della priorita, limiti geografici, stima dell'inizio evento e calcoli vettoriali del vento.
 
 ## Struttura
 
@@ -122,7 +125,7 @@ I contenuti EFFIS sono soggetti alle condizioni e alle attribuzioni Copernicus/C
 
 ## Limiti operativi
 
-Un hotspot e un'anomalia termica, non la conferma definitiva di un incendio boschivo. Fonti industriali, superfici molto calde e altri fenomeni possono produrre falsi positivi. Nubi, fumo, risoluzione del sensore e orari dei passaggi possono nascondere un evento. Per un sistema di allarme realmente operativo servono integrazione con sensori a terra, procedure di verifica, ridondanza, supervisione continua e collegamento con i canali istituzionali.
+Un hotspot e un'anomalia termica, non la conferma definitiva di un incendio boschivo. Fonti industriali, superfici molto calde e altri fenomeni possono produrre falsi positivi. Nubi, fumo, risoluzione del sensore e orari dei passaggi possono nascondere un evento. L'inizio evento e stimato dal primo rilevamento disponibile entro 5 km; il fuoco potrebbe essere iniziato prima. Il vento a 10 m indica il settore probabilmente sottovento, ma non descrive la dispersione verticale, la turbolenza, l'orografia o la chimica del pennacchio. Per un sistema di allarme realmente operativo servono integrazione con sensori a terra, procedure di verifica, ridondanza, supervisione continua e collegamento con i canali istituzionali.
 
 In presenza di fumo o fiamme, non attendere il satellite: chiamare **1515** o **112** e indicare posizione, direzione del fumo e riferimenti visibili.
 

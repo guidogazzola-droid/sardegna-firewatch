@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  annotateEstimatedStarts,
   buildFireStats,
   classifySeverity,
   normalizeConfidence,
@@ -54,4 +55,14 @@ test("fire stats aggregate normalized detections", () => {
   assert.equal(stats.total, 2);
   assert.equal(stats.highConfidence, 1);
   assert.equal(stats.maxFrp, 50);
+});
+
+test("event start is estimated from nearby satellite detections", () => {
+  const fires = annotateEstimatedStarts([
+    { latitude: 40, longitude: 9, observedAt: "2026-07-18T12:00:00Z" },
+    { latitude: 40.01, longitude: 9.01, observedAt: "2026-07-18T09:00:00Z" },
+    { latitude: 41, longitude: 10, observedAt: "2026-07-18T07:00:00Z" },
+  ]);
+  assert.equal(fires[0].estimatedStartAt, "2026-07-18T09:00:00.000Z");
+  assert.equal(fires[2].estimatedStartAt, "2026-07-18T07:00:00.000Z");
 });

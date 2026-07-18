@@ -14,6 +14,7 @@ const state = {
   map: null,
   pointLayer: null,
   watchLayer: null,
+  smokeLayer: null,
   markers: new Map(),
   effisLayers: {},
   fires: [],
@@ -141,6 +142,7 @@ function initMap() {
   state.pointLayer.addTo(state.map);
 
   state.watchLayer = L.layerGroup().addTo(state.map);
+  state.smokeLayer = L.layerGroup().addTo(state.map);
 
   const range = effisDateRange();
   const today = dateInRome(0);
@@ -202,6 +204,7 @@ function initMap() {
         "Hotspot VIIRS · EFFIS": state.effisLayers.viirs,
         "Hotspot MODIS · EFFIS": state.effisLayers.modis,
         "Punti con dettagli · FIRMS": state.pointLayer,
+        "Traiettoria indicativa del fumo": state.smokeLayer,
         "Aree bruciate recenti · EFFIS": state.effisLayers.burned,
         "Pericolo incendio FWI · EFFIS": state.effisLayers.fwi,
       },
@@ -272,6 +275,8 @@ function bindEvents() {
   document.addEventListener("click", (event) => {
     const weatherButton = event.target.closest("[data-weather-id]");
     if (weatherButton) loadWeather(weatherButton.dataset.weatherId, weatherButton);
+    const windButton = event.target.closest("[data-wind-id]");
+    if (windButton) loadWindHistory(windButton.dataset.windId, windButton);
   });
 
   window.addEventListener("resize", () => state.map?.invalidateSize());
@@ -374,7 +379,7 @@ function renderMarkers(fires) {
     });
 
     const marker = L.marker([fire.latitude, fire.longitude], { icon, title: zoneLabel(fire.latitude, fire.longitude) });
-    marker.bindPopup(buildPopupHtml(fire), { maxWidth: 290, minWidth: 250 });
+    marker.bindPopup(buildPopupHtml(fire), { maxWidth: 360, minWidth: 280 });
     state.pointLayer.addLayer(marker);
     state.markers.set(fire.id, marker);
   }
@@ -384,6 +389,12 @@ function buildPopupHtml(fire) {
   const confidence = confidenceLabel(fire.confidence);
   const frp = Number.isFinite(fire.frp) ? `${formatNumber(fire.frp, 1)} MW` : "Non disponibile";
   const observed = formatRome(fire.observedAt, { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+  const estimatedStart = formatRome(fire.estimatedStartAt || fire.observedAt, {
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
   const coordinates = `${fire.latitude.toFixed(5)}, ${fire.longitude.toFixed(5)}`;
   const osmUrl = `https://www.openstreetmap.org/?mlat=${fire.latitude}&mlon=${fire.longitude}#map=14/${fire.latitude}/${fire.longitude}`;
 
@@ -400,11 +411,14 @@ function buildPopupHtml(fire) {
         <div class="fire-popup-metric"><span>FRP</span><strong>${escapeHtml(frp)}</strong></div>
       </div>
       <div class="fire-popup-coordinates">Coordinate: ${coordinates} · ${escapeHtml(relativeAge(fire.observedAt))}</div>
+      <div class="fire-popup-start">Inizio stimato dai passaggi disponibili: <strong>${escapeHtml(estimatedStart)}</strong></div>
       <div class="fire-popup-actions">
         <button type="button" data-weather-id="${fire.id}">Meteo locale</button>
+        <button type="button" data-wind-id="${fire.id}">Vento e fumo</button>
         <a href="${osmUrl}" target="_blank" rel="noopener noreferrer">Apri mappa</a>
       </div>
       <div class="fire-popup-weather" id="weather-${fire.id}"></div>
+      <div class="fire-popup-wind" id="wind-${fire.id}"></div>
     </div>`;
 }
 
@@ -542,6 +556,103 @@ async function loadWeather(fireId, button) {
     button.textContent = "Riprova meteo";
     button.disabled = false;
   }
+}
+
+async function loadWindHistory(fireId, button) {
+  const fire = state.fires.find((item) => item.id === fireId);
+  const target = document.querySelector(`#wind-${CSS.escape(fireId)}`);
+  if (!fire || !target || button.disabled) return;
+
+  button.disabled = true;
+  button.textContent = "Calcolo...";
+  target.textContent = "Ricostruzione oraria del vento dal primo rilevamento disponibile...";
+
+  try {
+    const startAt = fire.estimatedStartAt || fire.observedAt;
+    const query = new URLSearchParams({
+      lat: String(fire.latitude),
+      lon: String(fire.longitude),
+      start: startAt,
+    });
+    const response = await fetch(`/api/wind-history?${query}`, { cache: "no-store" });
+    const payload = await response.json();
+    if (!response.ok || !payload.ok || !payload.summary) {
+      throw new Error(payload.details || payload.error || "Storico del vento non disponibile");
+    }
+
+    target.innerHTML = windHistoryMarkup(payload);
+    drawSmokeTrack(payload.smokeTrack, fire, payload.summary);
+    button.textContent = "Vento aggiornato";
+  } catch (error) {
+    target.textContent = error.message;
+    button.textContent = "Riprova vento";
+    button.disabled = false;
+  }
+}
+
+function windHistoryMarkup(payload) {
+  const summary = payload.summary;
+  const samples = Array.isArray(payload.samples) ? payload.samples : [];
+  const step = Math.max(1, Math.ceil(samples.length / 8));
+  const selected = samples.filter((_sample, index) => index % step === 0 || index === samples.length - 1);
+  const rows = selected
+    .slice(-9)
+    .map(
+      (sample) => `
+        <div class="wind-history-row">
+          <time>${escapeHtml(formatRome(sample.time, { weekday: "short", hour: "2-digit", minute: "2-digit" }))}</time>
+          <span class="wind-arrow" style="transform:rotate(${Math.round(sample.direction + 180)}deg)">↑</span>
+          <strong>${escapeHtml(compassLabel(sample.direction + 180))}</strong>
+          <span>${escapeHtml(formatNumber(sample.speed, 0))} km/h</span>
+        </div>`,
+    )
+    .join("");
+
+  return `
+    <div class="wind-summary">
+      <div>
+        <span>Vento prevalente da</span>
+        <strong>${escapeHtml(summary.windFromLabel)} · ${summary.windFromDegrees}°</strong>
+      </div>
+      <div class="smoke-direction">
+        <span>Fumo probabilmente verso</span>
+        <strong><i style="transform:rotate(${summary.smokeToDegrees}deg)">↑</i>${escapeHtml(summary.smokeToLabel)} · ${summary.smokeToDegrees}°</strong>
+      </div>
+    </div>
+    <div class="wind-speed-line">Media ${escapeHtml(formatNumber(summary.averageSpeed, 1))} km/h · massimo ${escapeHtml(formatNumber(summary.maxSpeed, 1))} · raffica ${escapeHtml(formatNumber(summary.maxGust, 1))}</div>
+    <div class="wind-history-list">${rows}</div>
+    <p class="wind-disclaimer">Vento a 10 m ricostruito con modelli meteorologici assimilati. La linea sulla mappa è indicativa e non sostituisce un modello di dispersione del fumo.</p>`;
+}
+
+function drawSmokeTrack(track, fire, summary) {
+  if (!Array.isArray(track) || track.length < 2 || !state.smokeLayer) return;
+  state.smokeLayer.clearLayers();
+  L.circleMarker([fire.latitude, fire.longitude], {
+    radius: 6,
+    color: "#ff885f",
+    fillColor: "#ff6a3d",
+    fillOpacity: 0.9,
+    weight: 2,
+  }).addTo(state.smokeLayer);
+  L.polyline(track, {
+    color: "#a8ddff",
+    weight: 4,
+    opacity: 0.9,
+    dashArray: "9 7",
+    lineCap: "round",
+  })
+    .bindTooltip(`Direzione probabile del fumo: ${summary.smokeToLabel} · linea indicativa`)
+    .addTo(state.smokeLayer);
+  const endpoint = track[track.length - 1];
+  L.circleMarker(endpoint, {
+    radius: 5,
+    color: "#d8f1ff",
+    fillColor: "#6aaefc",
+    fillOpacity: 0.9,
+    weight: 2,
+  })
+    .bindTooltip(`Settore sottovento ${summary.smokeToLabel}`)
+    .addTo(state.smokeLayer);
 }
 
 function restoreWatchArea() {
@@ -881,6 +992,13 @@ function severityLabel(value) {
       low: "Priorità bassa",
     }[value] || "Da verificare"
   );
+}
+
+function compassLabel(degrees) {
+  if (!Number.isFinite(Number(degrees))) return "n.d.";
+  const labels = ["N", "NE", "E", "SE", "S", "SO", "O", "NO"];
+  const normalized = ((Number(degrees) % 360) + 360) % 360;
+  return labels[Math.round(normalized / 45) % labels.length];
 }
 
 function relativeAge(value) {

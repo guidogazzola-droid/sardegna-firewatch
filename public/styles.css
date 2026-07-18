@@ -1550,7 +1550,7 @@ h2 {
 }
 
 .leaflet-popup-content {
-  width: 250px !important;
+  width: 310px !important;
   margin: 13px !important;
 }
 
@@ -1618,6 +1618,13 @@ h2 {
   font-size: 8px;
 }
 
+.fire-popup-start {
+  margin: -3px 0 9px;
+  color: var(--text-soft);
+  font-size: 8px;
+  line-height: 1.4;
+}
+
 .fire-popup-actions {
   display: flex;
   gap: 7px;
@@ -1644,6 +1651,10 @@ h2 {
   flex: 1;
 }
 
+.fire-popup-actions a {
+  flex: 0 0 auto;
+}
+
 .fire-popup-actions a:hover,
 .fire-popup-actions button:hover {
   border-color: var(--line-strong);
@@ -1655,6 +1666,110 @@ h2 {
   margin-top: 8px;
   color: var(--text-soft);
   font-size: 8px;
+  line-height: 1.45;
+}
+
+.fire-popup-wind {
+  min-height: 0;
+  margin-top: 8px;
+  color: var(--text-soft);
+  font-size: 8px;
+  line-height: 1.45;
+}
+
+.wind-summary {
+  display: grid;
+  grid-template-columns: 1fr 1.15fr;
+  gap: 6px;
+}
+
+.wind-summary > div {
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.wind-summary span,
+.wind-summary strong {
+  display: block;
+}
+
+.wind-summary span {
+  margin-bottom: 3px;
+  color: var(--muted);
+  font-size: 7px;
+  text-transform: uppercase;
+}
+
+.wind-summary strong {
+  color: var(--text);
+  font-size: 9px;
+}
+
+.smoke-direction {
+  border-color: rgba(106, 174, 252, 0.28) !important;
+  background: rgba(106, 174, 252, 0.08) !important;
+}
+
+.smoke-direction i {
+  width: 13px;
+  height: 13px;
+  margin-right: 5px;
+  display: inline-grid;
+  place-items: center;
+  color: #a8ddff;
+  font-size: 12px;
+  font-style: normal;
+  transform-origin: center;
+}
+
+.wind-speed-line {
+  margin: 7px 0;
+  color: var(--text-soft);
+  font-weight: 700;
+}
+
+.wind-history-list {
+  max-height: 128px;
+  overflow-y: auto;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.wind-history-row {
+  min-height: 24px;
+  display: grid;
+  grid-template-columns: 68px 15px 26px 1fr;
+  align-items: center;
+  gap: 5px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.045);
+}
+
+.wind-history-row:last-child {
+  border-bottom: 0;
+}
+
+.wind-history-row time {
+  color: var(--muted);
+}
+
+.wind-history-row .wind-arrow {
+  display: inline-grid;
+  place-items: center;
+  color: #a8ddff;
+  font-size: 12px;
+  transform-origin: center;
+}
+
+.wind-history-row strong {
+  color: var(--text);
+}
+
+.wind-disclaimer {
+  margin: 7px 0 0;
+  color: var(--muted);
+  font-size: 7px;
   line-height: 1.45;
 }
 
