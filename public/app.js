@@ -15,6 +15,10 @@ const state = {
   pointLayer: null,
   watchLayer: null,
   smokeLayer: null,
+  windLayer: null,
+  windAbortController: null,
+  windLoadTimer: null,
+  windErrorShown: false,
   markers: new Map(),
   effisLayers: {},
   fires: [],
@@ -93,7 +97,8 @@ async function init() {
   updateNotificationButton();
   renderTimeline([]);
   registerServiceWorker();
-  await refreshData({ manual: false });
+  await Promise.all([refreshData({ manual: false }), loadWindLayer()]);
+  updateMapHeadline();
   startCountdown();
 }
 
@@ -143,6 +148,7 @@ function initMap() {
 
   state.watchLayer = L.layerGroup().addTo(state.map);
   state.smokeLayer = L.layerGroup().addTo(state.map);
+  state.windLayer = L.layerGroup().addTo(state.map);
 
   const range = effisDateRange();
   const today = dateInRome(0);
@@ -204,6 +210,7 @@ function initMap() {
         "Hotspot VIIRS · EFFIS": state.effisLayers.viirs,
         "Hotspot MODIS · EFFIS": state.effisLayers.modis,
         "Punti con dettagli · FIRMS": state.pointLayer,
+        "Vento attuale · Open-Meteo": state.windLayer,
         "Traiettoria indicativa del fumo": state.smokeLayer,
         "Aree bruciate recenti · EFFIS": state.effisLayers.burned,
         "Pericolo incendio FWI · EFFIS": state.effisLayers.fwi,
@@ -218,11 +225,19 @@ function initMap() {
     setWatchArea(event.latlng.lat, event.latlng.lng, "mappa");
   });
 
-  state.map.on("overlayadd overlayremove", updateMapHeadline);
+  state.map.on("moveend", () => scheduleWindLayerRefresh());
+  state.map.on("overlayadd", (event) => {
+    updateMapHeadline();
+    if (event.layer === state.windLayer) loadWindLayer();
+  });
+  state.map.on("overlayremove", updateMapHeadline);
 }
 
 function bindEvents() {
-  elements.refreshButton.addEventListener("click", () => refreshData({ manual: true }));
+  elements.refreshButton.addEventListener("click", () => {
+    refreshData({ manual: true });
+    loadWindLayer();
+  });
   elements.sourceSelect.addEventListener("change", () => {
     state.sourceGroup = elements.sourceSelect.value;
     refreshData({ manual: true });
@@ -555,6 +570,97 @@ async function loadWeather(fireId, button) {
     target.textContent = error.message;
     button.textContent = "Riprova meteo";
     button.disabled = false;
+  }
+}
+
+function scheduleWindLayerRefresh(delay = 350) {
+  window.clearTimeout(state.windLoadTimer);
+  state.windLoadTimer = window.setTimeout(() => loadWindLayer(), delay);
+}
+
+async function loadWindLayer() {
+  if (!state.map || !state.windLayer || !state.map.hasLayer(state.windLayer)) return;
+
+  state.windAbortController?.abort();
+  const controller = new AbortController();
+  state.windAbortController = controller;
+  const bounds = state.map.getBounds();
+  const size = state.map.getSize();
+  const rows = clamp(Math.round(size.y / 150), 2, 5);
+  const columns = clamp(Math.round(size.x / 180), 3, 6);
+  const query = new URLSearchParams({
+    south: bounds.getSouth().toFixed(4),
+    west: bounds.getWest().toFixed(4),
+    north: bounds.getNorth().toFixed(4),
+    east: bounds.getEast().toFixed(4),
+    rows: String(rows),
+    columns: String(columns),
+  });
+
+  try {
+    const response = await fetch(`/api/wind-grid?${query}`, {
+      cache: "no-store",
+      signal: controller.signal,
+    });
+    const payload = await response.json();
+    if (!response.ok || !payload.ok) throw new Error(payload.error || "Vento non disponibile");
+    if (controller !== state.windAbortController) return;
+    renderWindLayer(payload.samples);
+    updateMapHeadline();
+    state.windErrorShown = false;
+  } catch (error) {
+    if (error.name === "AbortError") return;
+    console.error(error);
+    if (!state.windErrorShown) {
+      state.windErrorShown = true;
+      showToast(
+        "Vento temporaneamente non disponibile",
+        "Gli altri livelli della mappa restano attivi; le frecce verranno aggiornate automaticamente.",
+        "warning",
+        6000,
+      );
+    }
+  }
+}
+
+function renderWindLayer(samples) {
+  state.windLayer.clearLayers();
+  if (!Array.isArray(samples)) return;
+
+  for (const sample of samples) {
+    if (
+      !Number.isFinite(sample.latitude) ||
+      !Number.isFinite(sample.longitude) ||
+      !Number.isFinite(sample.directionTo) ||
+      !Number.isFinite(sample.speed)
+    ) {
+      continue;
+    }
+
+    const strengthClass = sample.speed >= 65 ? "is-severe" : sample.speed >= 40 ? "is-strong" : "";
+    const icon = L.divIcon({
+      className: "wind-map-marker",
+      html: `
+        <div class="wind-map-symbol ${strengthClass}">
+          <svg class="wind-map-arrow" viewBox="0 0 36 36" aria-hidden="true" style="transform:rotate(${Math.round(sample.directionTo)}deg)">
+            <path d="M18 31V7M9.5 15.5 18 7l8.5 8.5" />
+          </svg>
+          <span>${escapeHtml(formatNumber(sample.speed, 0))}</span>
+        </div>`,
+      iconSize: [48, 48],
+      iconAnchor: [24, 24],
+    });
+    const fromLabel = compassLabel(sample.directionFrom);
+    const toLabel = compassLabel(sample.directionTo);
+    const gust = Number.isFinite(sample.gust) ? ` · raffiche ${formatNumber(sample.gust, 0)} km/h` : "";
+    L.marker([sample.latitude, sample.longitude], {
+      icon,
+      keyboard: false,
+      riseOnHover: true,
+      zIndexOffset: -300,
+    })
+      .bindTooltip(`Vento verso ${toLabel} · ${formatNumber(sample.speed, 0)} km/h${gust} · proviene da ${fromLabel}`)
+      .addTo(state.windLayer);
   }
 }
 
@@ -896,9 +1002,10 @@ function updateMapHeadline() {
   if (state.map.hasLayer(state.effisLayers.burned)) active.push("aree bruciate");
   if (state.map.hasLayer(state.effisLayers.fwi)) active.push("FWI");
   if (state.map.hasLayer(state.pointLayer) && state.firmsConfigured) active.push("punti FIRMS");
+  if (state.map.hasLayer(state.windLayer)) active.push("vento attuale");
 
   elements.mapHeadline.textContent = active.length ? `Layer attivi: ${active.join(" · ")}` : "Nessun layer incendi attivo";
-  elements.mapSubheadline.textContent = "Usa il controllo in alto a destra per modificare la visualizzazione";
+  elements.mapSubheadline.textContent = "Le frecce indicano verso dove soffia il vento; il numero mostra i km/h";
 }
 
 function scheduleRefresh(seconds) {

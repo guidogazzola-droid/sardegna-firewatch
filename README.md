@@ -18,6 +18,7 @@ Il progetto usa due livelli di servizio:
 - classificazione visuale della priorita basata su confidenza e Fire Radiative Power;
 - meteo locale per ogni rilevamento tramite Open-Meteo;
 - storico orario del vento dal primo rilevamento satellitare disponibile fino alla consultazione;
+- frecce del vento attuale visibili direttamente sulla mappa, con direzione di movimento e velocita in km/h;
 - direzione prevalente sottovento e traiettoria indicativa del fumo visualizzata sulla mappa;
 - area personale con raggio da 5 a 100 km;
 - notifiche browser per nuovi hotspot vicini, mentre la pagina e aperta;
@@ -87,6 +88,7 @@ Aggiungere `FIRMS_MAP_KEY` come variabile segreta nell'ambiente di hosting. Per 
 - `GET /api/fires?days=1&sources=viirs` — rilevamenti normalizzati;
 - `GET /api/weather?lat=40.0&lon=9.0` — meteo locale per un punto.
 - `GET /api/wind-history?lat=40.0&lon=9.0&start=2026-07-18T10:00:00Z` — storico del vento e direzione indicativa del fumo.
+- `GET /api/wind-grid?south=38.7&west=7.7&north=41.4&east=10.2&rows=4&columns=5` — griglia del vento attuale per l'area visibile.
 
 Valori ammessi per `sources`: `viirs`, `modis`, `all`. L'intervallo `days` e limitato a 1-5 giorni.
 

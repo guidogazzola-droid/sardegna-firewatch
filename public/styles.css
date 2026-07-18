@@ -1211,6 +1211,17 @@ h2 {
   background: var(--low);
 }
 
+.legend-wind-arrow {
+  width: 14px;
+  height: 14px;
+  display: inline-grid;
+  place-items: center;
+  color: #b9ecff;
+  font-size: 15px;
+  font-style: normal;
+  font-weight: 900;
+}
+
 .legend-note {
   max-width: 150px;
   margin-top: 8px;
@@ -1535,6 +1546,62 @@ h2 {
 
 .leaflet-control-layers input {
   accent-color: var(--accent);
+}
+
+.wind-map-marker {
+  border: 0 !important;
+  background: transparent !important;
+}
+
+.wind-map-symbol {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  color: #b9ecff;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.9));
+}
+
+.wind-map-arrow {
+  position: absolute;
+  top: 1px;
+  left: 8px;
+  width: 32px;
+  height: 32px;
+  overflow: visible;
+  transform-origin: 50% 50%;
+}
+
+.wind-map-arrow path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 3.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.wind-map-symbol span {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  min-width: 25px;
+  padding: 2px 4px;
+  transform: translateX(-50%);
+  border: 1px solid rgba(185, 236, 255, 0.42);
+  border-radius: 999px;
+  background: rgba(8, 18, 24, 0.88);
+  color: #e5f8ff;
+  font-size: 8px;
+  font-weight: 900;
+  line-height: 1;
+  text-align: center;
+}
+
+.wind-map-symbol.is-strong {
+  color: #ffd479;
+}
+
+.wind-map-symbol.is-severe {
+  color: #ff806c;
 }
 
 .leaflet-popup-content-wrapper,

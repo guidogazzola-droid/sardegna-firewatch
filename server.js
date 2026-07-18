@@ -12,7 +12,11 @@ import {
   SARDINIA_BBOX,
 } from "./lib/config.js";
 import { fetchFirmsFires } from "./lib/firms.js";
-import { fetchWindHistory } from "./lib/wind.js";
+import {
+  buildWindGridPoints,
+  fetchCurrentWindGrid,
+  fetchWindHistory,
+} from "./lib/wind.js";
 
 dotenv.config();
 
@@ -53,6 +57,7 @@ app.get("/api/status", (_request, response) => {
       effis: true,
       firms: Boolean(firmsMapKey),
       weather: true,
+      windMap: true,
       windHistory: true,
     },
   });
@@ -167,6 +172,57 @@ app.get("/api/weather", async (request, response) => {
   } catch (error) {
     console.error("Weather request failed:", error);
     return response.status(502).json({ ok: false, error: "Meteo locale temporaneamente non disponibile." });
+  }
+});
+
+app.get("/api/wind-grid", async (request, response) => {
+  response.set("Cache-Control", "no-store");
+  const requestedBounds = {
+    south: Number.parseFloat(String(request.query.south || "")),
+    west: Number.parseFloat(String(request.query.west || "")),
+    north: Number.parseFloat(String(request.query.north || "")),
+    east: Number.parseFloat(String(request.query.east || "")),
+  };
+  if (
+    !Object.values(requestedBounds).every(Number.isFinite) ||
+    requestedBounds.north <= requestedBounds.south ||
+    requestedBounds.east <= requestedBounds.west
+  ) {
+    return response.status(400).json({ ok: false, error: "Limiti della mappa non validi." });
+  }
+
+  const bounds = {
+    south: Math.max(requestedBounds.south, SARDINIA_BBOX.south),
+    west: Math.max(requestedBounds.west, SARDINIA_BBOX.west),
+    north: Math.min(requestedBounds.north, SARDINIA_BBOX.north),
+    east: Math.min(requestedBounds.east, SARDINIA_BBOX.east),
+  };
+  if (bounds.north <= bounds.south || bounds.east <= bounds.west) {
+    return response.json({ ok: true, generatedAt: new Date().toISOString(), samples: [] });
+  }
+
+  const rows = Math.min(5, Math.max(2, Number.parseInt(String(request.query.rows || "4"), 10) || 4));
+  const columns = Math.min(6, Math.max(2, Number.parseInt(String(request.query.columns || "5"), 10) || 5));
+  const cacheKey = `wind-grid:${Object.values(bounds).map((value) => value.toFixed(2)).join(":")}:${rows}:${columns}`;
+  const cached = cache.get(cacheKey);
+  if (cached) return response.json({ ...cached, cached: true });
+
+  try {
+    const points = buildWindGridPoints(bounds, rows, columns);
+    const samples = await fetchCurrentWindGrid({ points });
+    const payload = {
+      ok: true,
+      generatedAt: new Date().toISOString(),
+      source: "Open-Meteo",
+      units: { speed: "km/h", direction: "°" },
+      bounds,
+      samples,
+    };
+    cache.set(cacheKey, payload, 10 * 60_000);
+    return response.json({ ...payload, cached: false });
+  } catch (error) {
+    console.error("Wind grid request failed:", error);
+    return response.status(502).json({ ok: false, error: "Mappa del vento temporaneamente non disponibile." });
   }
 });
 

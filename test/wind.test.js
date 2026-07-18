@@ -1,8 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  buildWindGridPoints,
   buildSmokeTrack,
   compassLabel,
+  parseCurrentWindGrid,
   parseWindPayload,
   summarizeWind,
 } from "../lib/wind.js";
@@ -49,4 +51,41 @@ test("wind payload is filtered to the requested event interval", () => {
   );
   assert.equal(samples.length, 1);
   assert.equal(samples[0].speed, 12);
+});
+
+test("wind grid uses evenly spaced cell centers", () => {
+  const points = buildWindGridPoints({ south: 38, west: 8, north: 40, east: 10 }, 2, 2);
+  assert.deepEqual(points, [
+    { latitude: 38.5, longitude: 8.5 },
+    { latitude: 38.5, longitude: 9.5 },
+    { latitude: 39.5, longitude: 8.5 },
+    { latitude: 39.5, longitude: 9.5 },
+  ]);
+});
+
+test("current wind grid converts meteorological direction into movement direction", () => {
+  const samples = parseCurrentWindGrid(
+    [
+      {
+        current: {
+          time: "2026-07-18T12:00",
+          wind_speed_10m: 24.36,
+          wind_direction_10m: 270,
+          wind_gusts_10m: 41.22,
+        },
+      },
+    ],
+    [{ latitude: 40, longitude: 9 }],
+  );
+  assert.deepEqual(samples, [
+    {
+      latitude: 40,
+      longitude: 9,
+      speed: 24.4,
+      gust: 41.2,
+      directionFrom: 270,
+      directionTo: 90,
+      observedAt: "2026-07-18T12:00:00.000Z",
+    },
+  ]);
 });
