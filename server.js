@@ -12,6 +12,7 @@ import {
   SARDINIA_BBOX,
 } from "./lib/config.js";
 import { fetchFirmsFires } from "./lib/firms.js";
+import { fetchCloudForecast } from "./lib/cloud.js";
 import {
   buildWindGridPoints,
   fetchCurrentWindGrid,
@@ -59,6 +60,7 @@ app.get("/api/status", (_request, response) => {
       weather: true,
       windMap: true,
       windHistory: true,
+      cloudForecast: true,
     },
   });
 });
@@ -223,6 +225,34 @@ app.get("/api/wind-grid", async (request, response) => {
   } catch (error) {
     console.error("Wind grid request failed:", error);
     return response.status(502).json({ ok: false, error: "Mappa del vento temporaneamente non disponibile." });
+  }
+});
+
+app.get("/api/cloud-forecast", async (_request, response) => {
+  response.set("Cache-Control", "no-store");
+  const cacheKey = "cloud-forecast:sardinia:5x5:25h";
+  const cached = cache.get(cacheKey);
+  if (cached) return response.json({ ...cached, cached: true });
+
+  try {
+    const points = buildWindGridPoints(SARDINIA_BBOX, 5, 5);
+    const frames = await fetchCloudForecast({ points, hours: 25 });
+    const payload = {
+      ok: true,
+      generatedAt: new Date().toISOString(),
+      source: "Open-Meteo",
+      methodology: "Copertura nuvolosa oraria modellata; non e un'immagine satellitare osservata.",
+      bounds: SARDINIA_BBOX,
+      frames,
+    };
+    cache.set(cacheKey, payload, 20 * 60_000);
+    return response.json({ ...payload, cached: false });
+  } catch (error) {
+    console.error("Cloud forecast request failed:", error);
+    return response.status(502).json({
+      ok: false,
+      error: "Previsione della nuvolosita temporaneamente non disponibile.",
+    });
   }
 });
 

@@ -16,9 +16,15 @@ const state = {
   watchLayer: null,
   smokeLayer: null,
   windLayer: null,
+  cloudLayer: null,
   windAbortController: null,
   windLoadTimer: null,
   windErrorShown: false,
+  cloudFrames: [],
+  cloudFrameIndex: 0,
+  cloudTimer: null,
+  cloudAbortController: null,
+  cloudErrorShown: false,
   markers: new Map(),
   effisLayers: {},
   fires: [],
@@ -79,6 +85,11 @@ const elements = {
   cancelPickButton: document.querySelector("#cancelPickButton"),
   mapHeadline: document.querySelector("#mapHeadline"),
   mapSubheadline: document.querySelector("#mapSubheadline"),
+  cloudTimeline: document.querySelector("#cloudTimeline"),
+  cloudPlayButton: document.querySelector("#cloudPlayButton"),
+  cloudRange: document.querySelector("#cloudRange"),
+  cloudTime: document.querySelector("#cloudTime"),
+  cloudCoverage: document.querySelector("#cloudCoverage"),
   toastContainer: document.querySelector("#toastContainer"),
 };
 
@@ -97,7 +108,7 @@ async function init() {
   updateNotificationButton();
   renderTimeline([]);
   registerServiceWorker();
-  await Promise.all([refreshData({ manual: false }), loadWindLayer()]);
+  await Promise.all([refreshData({ manual: false }), loadWindLayer(), loadCloudForecast()]);
   updateMapHeadline();
   startCountdown();
 }
@@ -149,6 +160,10 @@ function initMap() {
   state.watchLayer = L.layerGroup().addTo(state.map);
   state.smokeLayer = L.layerGroup().addTo(state.map);
   state.windLayer = L.layerGroup().addTo(state.map);
+  state.map.createPane("cloudPane");
+  state.map.getPane("cloudPane").style.zIndex = "350";
+  state.map.getPane("cloudPane").style.pointerEvents = "none";
+  state.cloudLayer = L.layerGroup().addTo(state.map);
 
   const range = effisDateRange();
   const today = dateInRome(0);
@@ -211,6 +226,7 @@ function initMap() {
         "Hotspot MODIS · EFFIS": state.effisLayers.modis,
         "Punti con dettagli · FIRMS": state.pointLayer,
         "Vento attuale · Open-Meteo": state.windLayer,
+        "Nuvolosità prevista · Open-Meteo": state.cloudLayer,
         "Traiettoria indicativa del fumo": state.smokeLayer,
         "Aree bruciate recenti · EFFIS": state.effisLayers.burned,
         "Pericolo incendio FWI · EFFIS": state.effisLayers.fwi,
@@ -229,14 +245,25 @@ function initMap() {
   state.map.on("overlayadd", (event) => {
     updateMapHeadline();
     if (event.layer === state.windLayer) loadWindLayer();
+    if (event.layer === state.cloudLayer) {
+      elements.cloudTimeline.hidden = !state.cloudFrames.length;
+      if (!state.cloudFrames.length) loadCloudForecast();
+    }
   });
-  state.map.on("overlayremove", updateMapHeadline);
+  state.map.on("overlayremove", (event) => {
+    updateMapHeadline();
+    if (event.layer === state.cloudLayer) {
+      stopCloudAnimation();
+      elements.cloudTimeline.hidden = true;
+    }
+  });
 }
 
 function bindEvents() {
   elements.refreshButton.addEventListener("click", () => {
     refreshData({ manual: true });
     loadWindLayer();
+    loadCloudForecast({ preserveFrame: true });
   });
   elements.sourceSelect.addEventListener("change", () => {
     state.sourceGroup = elements.sourceSelect.value;
@@ -276,6 +303,11 @@ function bindEvents() {
   elements.notificationButton.addEventListener("click", requestNotifications);
   elements.clearWatchButton.addEventListener("click", clearWatchArea);
   elements.fitSardiniaButton.addEventListener("click", () => state.map.fitBounds(SARDINIA_BOUNDS, { padding: [20, 20] }));
+  elements.cloudPlayButton.addEventListener("click", toggleCloudAnimation);
+  elements.cloudRange.addEventListener("input", () => {
+    stopCloudAnimation();
+    renderCloudFrame(Number.parseInt(elements.cloudRange.value, 10) || 0);
+  });
 
   elements.systemBannerClose.addEventListener("click", () => {
     elements.systemBanner.hidden = true;
@@ -664,6 +696,104 @@ function renderWindLayer(samples) {
   }
 }
 
+async function loadCloudForecast({ preserveFrame = false } = {}) {
+  if (!state.cloudLayer) return;
+  state.cloudAbortController?.abort();
+  const controller = new AbortController();
+  state.cloudAbortController = controller;
+
+  try {
+    const response = await fetch("/api/cloud-forecast", {
+      cache: "no-store",
+      signal: controller.signal,
+    });
+    const payload = await response.json();
+    if (!response.ok || !payload.ok || !Array.isArray(payload.frames)) {
+      throw new Error(payload.error || "Nuvolosità non disponibile");
+    }
+    if (controller !== state.cloudAbortController) return;
+
+    const previousTime = preserveFrame ? state.cloudFrames[state.cloudFrameIndex]?.time : null;
+    state.cloudFrames = payload.frames;
+    const matchingIndex = previousTime
+      ? state.cloudFrames.findIndex((frame) => frame.time === previousTime)
+      : -1;
+    state.cloudFrameIndex = matchingIndex >= 0 ? matchingIndex : 0;
+    elements.cloudRange.max = String(Math.max(0, state.cloudFrames.length - 1));
+    elements.cloudTimeline.hidden = !state.map.hasLayer(state.cloudLayer) || !state.cloudFrames.length;
+    renderCloudFrame(state.cloudFrameIndex);
+    state.cloudErrorShown = false;
+  } catch (error) {
+    if (error.name === "AbortError") return;
+    console.error(error);
+    if (!state.cloudErrorShown) {
+      state.cloudErrorShown = true;
+      showToast(
+        "Nuvolosità temporaneamente non disponibile",
+        "Il livello verrà riprovato al prossimo aggiornamento.",
+        "warning",
+        6000,
+      );
+    }
+  }
+}
+
+function renderCloudFrame(index) {
+  if (!state.cloudFrames.length || !state.cloudLayer) return;
+  const safeIndex = clamp(index, 0, state.cloudFrames.length - 1);
+  const frame = state.cloudFrames[safeIndex];
+  state.cloudFrameIndex = safeIndex;
+  state.cloudLayer.clearLayers();
+
+  for (const sample of frame.samples ?? []) {
+    if (!Number.isFinite(sample.cover) || sample.cover < 8) continue;
+    const opacity = 0.035 + (sample.cover / 100) * 0.3;
+    L.circle([sample.latitude, sample.longitude], {
+      pane: "cloudPane",
+      radius: 42_000,
+      stroke: false,
+      fill: true,
+      fillColor: "#f3f8fb",
+      fillOpacity: opacity,
+      className: "cloud-forecast-cell",
+      interactive: false,
+    }).addTo(state.cloudLayer);
+  }
+
+  elements.cloudRange.value = String(safeIndex);
+  elements.cloudTime.textContent = formatRome(frame.time, {
+    weekday: "short",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  elements.cloudCoverage.textContent = `${formatNumber(frame.averageCover, 0)}%`;
+  elements.mapSubheadline.textContent = `Nuvolosità modellata · ${elements.cloudTime.textContent} · media ${elements.cloudCoverage.textContent}`;
+}
+
+function toggleCloudAnimation() {
+  if (state.cloudTimer) stopCloudAnimation();
+  else startCloudAnimation();
+}
+
+function startCloudAnimation() {
+  if (state.cloudTimer || state.cloudFrames.length < 2) return;
+  elements.cloudPlayButton.textContent = "❚❚";
+  elements.cloudPlayButton.setAttribute("aria-label", "Metti in pausa l'animazione nuvole");
+  elements.cloudPlayButton.title = "Pausa animazione nuvole";
+  state.cloudTimer = window.setInterval(() => {
+    renderCloudFrame((state.cloudFrameIndex + 1) % state.cloudFrames.length);
+  }, 900);
+}
+
+function stopCloudAnimation() {
+  window.clearInterval(state.cloudTimer);
+  state.cloudTimer = null;
+  elements.cloudPlayButton.textContent = "▶";
+  elements.cloudPlayButton.setAttribute("aria-label", "Avvia animazione nuvole");
+  elements.cloudPlayButton.title = "Avvia animazione nuvole";
+}
+
 async function loadWindHistory(fireId, button) {
   const fire = state.fires.find((item) => item.id === fireId);
   const target = document.querySelector(`#wind-${CSS.escape(fireId)}`);
@@ -1003,6 +1133,7 @@ function updateMapHeadline() {
   if (state.map.hasLayer(state.effisLayers.fwi)) active.push("FWI");
   if (state.map.hasLayer(state.pointLayer) && state.firmsConfigured) active.push("punti FIRMS");
   if (state.map.hasLayer(state.windLayer)) active.push("vento attuale");
+  if (state.map.hasLayer(state.cloudLayer)) active.push("nuvolosità prevista");
 
   elements.mapHeadline.textContent = active.length ? `Layer attivi: ${active.join(" · ")}` : "Nessun layer incendi attivo";
   elements.mapSubheadline.textContent = "Le frecce indicano verso dove soffia il vento; il numero mostra i km/h";

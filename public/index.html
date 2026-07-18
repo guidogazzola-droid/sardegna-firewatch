@@ -224,7 +224,7 @@
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9" /></svg>
             </a>
             <a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer">
-              <span><strong>Open-Meteo</strong><small>Meteo e storico orario del vento</small></span>
+              <span><strong>Open-Meteo</strong><small>Meteo, vento e nuvolosità prevista</small></span>
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9" /></svg>
             </a>
           </div>
@@ -259,8 +259,19 @@
             <div class="legend-row"><i class="legend-dot medium"></i><span>Nominale</span></div>
             <div class="legend-row"><i class="legend-dot low"></i><span>Bassa</span></div>
             <div class="legend-row"><i class="legend-wind-arrow">↑</i><span>Vento verso cui soffia · km/h</span></div>
+            <div class="legend-row"><i class="legend-cloud"></i><span>Nuvolosità prevista</span></div>
             <div class="legend-note">I layer EFFIS hanno simbologia propria.</div>
           </div>
+        </div>
+
+        <div id="cloudTimeline" class="cloud-timeline" hidden>
+          <button id="cloudPlayButton" type="button" aria-label="Avvia animazione nuvole" title="Avvia animazione nuvole">▶</button>
+          <div class="cloud-timeline-copy">
+            <span>Nuvolosità prevista</span>
+            <strong id="cloudTime">—</strong>
+          </div>
+          <input id="cloudRange" type="range" min="0" max="0" value="0" step="1" aria-label="Ora della previsione nuvolosa" />
+          <output id="cloudCoverage">—%</output>
         </div>
 
         <div class="map-bottom-right">

@@ -1099,6 +1099,76 @@ h2 {
   bottom: 18px;
 }
 
+.cloud-timeline {
+  position: absolute;
+  z-index: 520;
+  left: 50%;
+  bottom: 18px;
+  width: min(520px, calc(100% - 390px));
+  min-height: 48px;
+  padding: 7px 10px;
+  display: grid;
+  grid-template-columns: 34px 124px minmax(120px, 1fr) 42px;
+  align-items: center;
+  gap: 9px;
+  transform: translateX(-50%);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 14px;
+  background: rgba(12, 18, 20, 0.9);
+  box-shadow: var(--shadow-md);
+  backdrop-filter: blur(14px);
+  pointer-events: auto;
+}
+
+.cloud-timeline[hidden] {
+  display: none;
+}
+
+.cloud-timeline button {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(185, 236, 255, 0.25);
+  border-radius: 9px;
+  background: rgba(185, 236, 255, 0.08);
+  color: #dff7ff;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.cloud-timeline-copy span,
+.cloud-timeline-copy strong {
+  display: block;
+}
+
+.cloud-timeline-copy span {
+  margin-bottom: 2px;
+  color: var(--muted);
+  font-size: 7px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.cloud-timeline-copy strong {
+  color: var(--text);
+  font-size: 9px;
+}
+
+.cloud-timeline input {
+  width: 100%;
+  accent-color: #b9ecff;
+  cursor: pointer;
+}
+
+.cloud-timeline output {
+  color: #dff7ff;
+  font-size: 10px;
+  font-weight: 900;
+  text-align: right;
+}
+
 .map-title-card {
   width: fit-content;
   max-width: 560px;
@@ -1220,6 +1290,14 @@ h2 {
   font-size: 15px;
   font-style: normal;
   font-weight: 900;
+}
+
+.legend-cloud {
+  width: 14px;
+  height: 9px;
+  border-radius: 999px;
+  background: rgba(243, 248, 251, 0.7);
+  box-shadow: 0 0 8px rgba(243, 248, 251, 0.55);
 }
 
 .legend-note {
@@ -1551,6 +1629,15 @@ h2 {
 .wind-map-marker {
   border: 0 !important;
   background: transparent !important;
+}
+
+.leaflet-cloud-pane svg {
+  overflow: visible;
+}
+
+.cloud-forecast-cell {
+  filter: blur(16px);
+  mix-blend-mode: screen;
 }
 
 .wind-map-symbol {
@@ -2025,6 +2112,16 @@ h2 {
     display: none;
   }
 
+  .cloud-timeline {
+    left: 12px;
+    right: 64px;
+    bottom: 14px;
+    width: auto;
+    grid-template-columns: 34px 100px minmax(70px, 1fr) 38px;
+    gap: 7px;
+    transform: none;
+  }
+
   .emergency-bar {
     height: var(--emergency-height);
     padding: 9px 12px;
@@ -2080,6 +2177,20 @@ h2 {
 
   .topbar-actions {
     gap: 7px;
+  }
+
+  .cloud-timeline {
+    padding: 6px 8px;
+    grid-template-columns: 32px 72px minmax(60px, 1fr) 34px;
+    gap: 5px;
+  }
+
+  .cloud-timeline-copy span {
+    display: none;
+  }
+
+  .cloud-timeline-copy strong {
+    font-size: 7.5px;
   }
 
   .icon-button {
