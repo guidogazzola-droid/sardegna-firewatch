@@ -1,8 +1,8 @@
 import { Tabs } from "expo-router";
-import { Text } from "react-native";
+import { Text, type ColorValue } from "react-native";
 import { useAppTheme } from "../../src/theme";
 
-function TabIcon({ symbol, color }: { symbol: string; color: string }) {
+function TabIcon({ symbol, color }: { symbol: string; color: ColorValue }) {
   return <Text style={{ color, fontSize: 18 }}>{symbol}</Text>;
 }
 
