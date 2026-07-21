@@ -34,7 +34,29 @@ jobs:
         run: npm install --no-audit --no-fund
 
       - name: Type-check
-        run: npm run typecheck
+        id: typecheck
+        shell: bash
+        run: |
+          set +e
+          npm run typecheck -- --pretty false > typecheck.log 2>&1
+          status=$?
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Upload TypeScript diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-typecheck-${{ github.run_id }}
+          path: mobile/typecheck.log
+          if-no-files-found: error
+          retention-days: 3
 
       - name: Resolve public Expo config
         run: npx expo config --type public
+
+      - name: Fail when TypeScript has errors
+        if: steps.typecheck.outputs.status != '0'
+        run: |
+          cat typecheck.log
+          exit 1
