@@ -1,6 +1,7 @@
 import type { ConfigContext, ExpoConfig } from "expo/config";
-import { EAS_PROJECT_ID } from "./eas-project";
+import easProject from "./eas-project.json";
 
+const EAS_PROJECT_ID = easProject.projectId;
 const API_BASE_URL =
   process.env.EXPO_PUBLIC_API_BASE_URL ?? "https://sardegna-firewatch.onrender.com";
 
