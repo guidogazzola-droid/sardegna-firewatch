@@ -1,7 +1,7 @@
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFireData } from "../../src/context/fire-data";
-import { API_BASE_URL } from "../../src/lib/config";
+import { API_BASE_URL, PRIVACY_POLICY_URL, SUPPORT_URL } from "../../src/lib/config";
 import { spacing, useAppTheme } from "../../src/theme";
 
 export default function SettingsScreen() {
@@ -38,6 +38,12 @@ export default function SettingsScreen() {
           <ExternalLink label="Copernicus EFFIS" url="https://forest-fire.emergency.copernicus.eu/" />
           <ExternalLink label="Open-Meteo" url="https://open-meteo.com/" />
           <ExternalLink label="Bollettino Regione Sardegna" url="https://www.sardegnaambiente.it/index.php?c=7093&s=20&v=9&xsl=2273" />
+        </Section>
+
+        <Section title="Supporto e privacy">
+          <ExternalLink label="Supporto" url={SUPPORT_URL} />
+          <ExternalLink label="Privacy Policy" url={PRIVACY_POLICY_URL} />
+          <Text style={[styles.meta, { color: theme.textMuted }]}>Non inserire dati personali o coordinate private nelle segnalazioni pubbliche.</Text>
         </Section>
 
         <Section title="Versione tecnica">

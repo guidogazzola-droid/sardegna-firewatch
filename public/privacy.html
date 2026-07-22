@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Privacy Policy · Sardinia FireWatch</title>
+    <meta
+      name="description"
+      content="Informativa sulla privacy di Sardinia FireWatch per app iPhone e servizio web."
+    />
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #f4f6f8;
+        --surface: #ffffff;
+        --text: #172026;
+        --muted: #5f6b73;
+        --border: #dce3e8;
+        --accent: #0b6e4f;
+        --warning-bg: #fff6e8;
+        --warning: #7a4700;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0e1418;
+          --surface: #172026;
+          --text: #f5f7f8;
+          --muted: #aab5bc;
+          --border: #334149;
+          --accent: #63d4ad;
+          --warning-bg: #302617;
+          --warning: #f2b45f;
+        }
+      }
+
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        line-height: 1.62;
+      }
+      main {
+        width: min(760px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 48px 0 72px;
+      }
+      header, section {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        padding: clamp(20px, 4vw, 34px);
+        margin-bottom: 16px;
+      }
+      .eyebrow {
+        margin: 0 0 6px;
+        color: var(--accent);
+        font-size: 0.76rem;
+        font-weight: 800;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+      h1, h2 { line-height: 1.2; }
+      h1 { margin: 0 0 12px; font-size: clamp(2rem, 6vw, 3rem); }
+      h2 { margin: 0 0 12px; font-size: 1.2rem; }
+      p { margin: 0 0 12px; }
+      p:last-child { margin-bottom: 0; }
+      ul { margin: 8px 0 0; padding-left: 22px; }
+      li + li { margin-top: 8px; }
+      .muted { color: var(--muted); }
+      .notice {
+        background: var(--warning-bg);
+        color: var(--warning);
+        border-color: color-mix(in srgb, var(--warning) 35%, transparent);
+      }
+      a { color: var(--accent); font-weight: 700; }
+      code {
+        background: color-mix(in srgb, var(--surface) 70%, var(--border));
+        border-radius: 6px;
+        padding: 2px 5px;
+      }
+      footer { color: var(--muted); text-align: center; font-size: 0.88rem; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <p class="eyebrow">Sardinia FireWatch</p>
+        <h1>Privacy Policy</h1>
+        <p class="muted">Ultimo aggiornamento: 21 luglio 2026</p>
+        <p>
+          Questa informativa descrive come Sardinia FireWatch tratta i dati nell'app iPhone e nel
+          servizio web collegato. Il progetto e gestito da Guido Gazzola come sviluppatore individuale.
+        </p>
+      </header>
+
+      <section>
+        <h2>Principi della versione iniziale</h2>
+        <ul>
+          <li>Non e necessario creare un account.</li>
+          <li>Non vengono usati sistemi pubblicitari o strumenti di profilazione.</li>
+          <li>Non viene utilizzata la posizione in background.</li>
+          <li>La zona monitorata resta memorizzata sul dispositivo.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Posizione</h2>
+        <p>
+          L'app richiede l'accesso alla posizione soltanto quando l'utente preme il comando dedicato.
+          La posizione viene usata per creare una zona monitorata e calcolare localmente quali
+          rilevazioni recenti ricadono nel raggio selezionato.
+        </p>
+        <p>
+          Nella versione iniziale, le coordinate della zona monitorata non vengono inviate al backend
+          Sardinia FireWatch. Restano nello spazio di archiviazione locale dell'app finche l'utente non
+          rimuove la zona o disinstalla l'app.
+        </p>
+      </section>
+
+      <section>
+        <h2>Dati tecnici e richieste di rete</h2>
+        <p>
+          Quando l'app o il sito contattano il backend, il fornitore dell'infrastruttura puo trattare
+          dati tecnici normalmente associati a una richiesta Internet, come indirizzo IP, data e ora,
+          percorso richiesto, informazioni sul dispositivo o log di errore. Questi dati servono alla
+          sicurezza, alla disponibilita e alla diagnosi del servizio e non vengono usati da Sardinia
+          FireWatch per pubblicita comportamentale.
+        </p>
+      </section>
+
+      <section>
+        <h2>Servizi e fonti esterne</h2>
+        <p>L'app utilizza o visualizza dati provenienti da servizi esterni, tra cui:</p>
+        <ul>
+          <li>NASA FIRMS per le rilevazioni termiche satellitari;</li>
+          <li>Copernicus EFFIS per livelli cartografici di contesto;</li>
+          <li>Open-Meteo per informazioni meteorologiche modellate;</li>
+          <li>MapLibre e il fornitore di stile o tessere cartografiche configurato nell'app.</li>
+        </ul>
+        <p>
+          Quando vengono caricati dati o mappe, i rispettivi fornitori possono ricevere informazioni
+          tecniche necessarie a rispondere alla richiesta, secondo le proprie informative e condizioni.
+        </p>
+      </section>
+
+      <section>
+        <h2>Notifiche</h2>
+        <p>
+          Le notifiche push in background non sono attive nella prima versione. Quando la funzione
+          verra abilitata, questa informativa sara aggiornata prima della raccolta di token del
+          dispositivo o preferenze di notifica sul server.
+        </p>
+      </section>
+
+      <section>
+        <h2>Conservazione e controllo dell'utente</h2>
+        <p>
+          La zona monitorata puo essere cancellata direttamente dall'app. I log tecnici del servizio
+          possono essere conservati per il periodo necessario alla sicurezza e alla gestione
+          dell'infrastruttura, secondo la configurazione e le condizioni del fornitore di hosting.
+        </p>
+      </section>
+
+      <section>
+        <h2>Minori</h2>
+        <p>
+          Sardinia FireWatch non e progettata per raccogliere consapevolmente dati personali di minori
+          e non offre funzioni sociali, messaggistica o creazione di profili.
+        </p>
+      </section>
+
+      <section>
+        <h2>Modifiche all'informativa</h2>
+        <p>
+          Questa pagina verra aggiornata quando cambieranno le funzioni dell'app, i fornitori o le
+          modalita di trattamento. La data dell'ultima revisione e indicata all'inizio della pagina.
+        </p>
+      </section>
+
+      <section>
+        <h2>Contatti</h2>
+        <p>
+          Per domande sulla privacy o richieste relative al progetto, usa il canale pubblico di supporto:
+          <a href="https://github.com/guidogazzola-droid/sardegna-firewatch/issues">GitHub Issues di Sardinia FireWatch</a>.
+        </p>
+      </section>
+
+      <section class="notice">
+        <h2>Servizio informativo</h2>
+        <p>
+          Sardinia FireWatch non e un sistema ufficiale di emergenza. In presenza di fumo o fiamme,
+          contatta immediatamente il 112 o il 1515 e segui le indicazioni delle autorita competenti.
+        </p>
+      </section>
+
+      <footer>
+        <a href="/">Torna a Sardinia FireWatch</a>
+        <span aria-hidden="true"> · </span>
+        <a href="/support.html">Supporto</a>
+      </footer>
+    </main>
+  </body>
+</html>
