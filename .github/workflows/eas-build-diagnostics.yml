@@ -1,0 +1,124 @@
+name: Inspect failed EAS build
+
+on:
+  push:
+    branches:
+      - diagnostics/eas-build-8ef68970
+    paths:
+      - ".github/workflows/eas-build-diagnostics.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.16.0"
+
+      - name: Require Expo token
+        shell: bash
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "::error::EXPO_TOKEN is not available to GitHub Actions."
+            exit 1
+          fi
+
+      - name: Read build metadata
+        working-directory: mobile
+        shell: bash
+        run: |
+          set -o pipefail
+          npx --yes eas-cli@latest build:view 8ef68970-12e5-4d27-8e34-720da16878f5 --json \
+            > "$RUNNER_TEMP/eas-build-view.json" \
+            2> "$RUNNER_TEMP/eas-build-view.stderr"
+
+      - name: Download available build logs
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const path = require('node:path');
+
+          const temp = process.env.RUNNER_TEMP;
+          const source = path.join(temp, 'eas-build-view.json');
+          const outputDir = path.join(temp, 'eas-build-logs');
+          fs.mkdirSync(outputDir, { recursive: true });
+
+          const data = JSON.parse(fs.readFileSync(source, 'utf8'));
+          const urls = [];
+
+          function walk(value, trail = []) {
+            if (typeof value === 'string' && /^https:\/\//.test(value)) {
+              const label = trail.join('.').toLowerCase();
+              if (label.includes('log')) urls.push({ label: trail.join('.'), url: value });
+              return;
+            }
+            if (Array.isArray(value)) {
+              value.forEach((entry, index) => walk(entry, [...trail, String(index)]));
+              return;
+            }
+            if (value && typeof value === 'object') {
+              Object.entries(value).forEach(([key, entry]) => walk(entry, [...trail, key]));
+            }
+          }
+
+          walk(data);
+          fs.writeFileSync(
+            path.join(outputDir, 'summary.json'),
+            JSON.stringify({
+              id: data.id ?? null,
+              status: data.status ?? null,
+              error: data.error ?? null,
+              platform: data.platform ?? null,
+              profile: data.buildProfile ?? data.profile ?? null,
+              topLevelKeys: Object.keys(data),
+              logUrlCount: urls.length,
+              logUrlLabels: urls.map((item) => item.label),
+            }, null, 2),
+          );
+          fs.copyFileSync(source, path.join(outputDir, 'build-view.json'));
+
+          Promise.all(urls.map(async ({ label, url }, index) => {
+            const response = await fetch(url);
+            const text = await response.text();
+            const safeLabel = label.replace(/[^a-z0-9_.-]+/gi, '_');
+            fs.writeFileSync(
+              path.join(outputDir, `${String(index + 1).padStart(2, '0')}-${safeLabel}.log`),
+              text,
+            );
+          })).then(() => {
+            console.log(`Downloaded ${urls.length} log resource(s).`);
+          }).catch((error) => {
+            console.error(error);
+            process.exitCode = 1;
+          });
+          NODE
+
+      - name: Include command diagnostics
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/eas-build-logs"
+          if [ -f "$RUNNER_TEMP/eas-build-view.stderr" ]; then
+            cp "$RUNNER_TEMP/eas-build-view.stderr" "$RUNNER_TEMP/eas-build-logs/command.stderr"
+          fi
+
+      - name: Upload diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eas-build-8ef68970-diagnostics
+          path: ${{ runner.temp }}/eas-build-logs
+          if-no-files-found: error
+          retention-days: 3
