@@ -27,7 +27,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "22.16.0"
+          node-version: "24.4.1"
 
       - name: Require Expo token
         shell: bash
@@ -37,12 +37,36 @@ jobs:
             exit 1
           fi
 
+      - name: Create a static Expo context for diagnostics
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/eas-inspector" "$RUNNER_TEMP/eas-build-logs"
+          cat > "$RUNNER_TEMP/eas-inspector/app.json" <<'JSON'
+          {
+            "expo": {
+              "name": "Sardinia FireWatch",
+              "slug": "sardinia-firewatch",
+              "owner": "camerun",
+              "extra": {
+                "eas": {
+                  "projectId": "1c16e830-7f0b-49d8-844d-8f46d28ed15b"
+                }
+              }
+            }
+          }
+          JSON
+          cat > "$RUNNER_TEMP/eas-inspector/package.json" <<'JSON'
+          {
+            "name": "eas-inspector",
+            "private": true
+          }
+          JSON
+
       - name: Capture EAS CLI diagnostics
-        working-directory: mobile
+        working-directory: ${{ runner.temp }}/eas-inspector
         shell: bash
         run: |
           output="$RUNNER_TEMP/eas-build-logs"
-          mkdir -p "$output"
 
           npx --yes eas-cli@latest --version > "$output/eas-version.txt" 2>&1 || true
           npx --yes eas-cli@latest whoami > "$output/whoami.txt" 2>&1 || true
