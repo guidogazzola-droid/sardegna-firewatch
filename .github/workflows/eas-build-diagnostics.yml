@@ -6,6 +6,9 @@ on:
       - diagnostics/eas-build-8ef68970
     paths:
       - ".github/workflows/eas-build-diagnostics.yml"
+  pull_request:
+    paths:
+      - ".github/workflows/eas-build-diagnostics.yml"
   workflow_dispatch:
 
 permissions:
