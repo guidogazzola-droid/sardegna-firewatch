@@ -55,7 +55,66 @@ jobs:
           cat npm-ci.log
           exit 0
 
-      - name: Upload lockfile diagnostics
+      - name: Type-check
+        id: typecheck
+        if: steps.clean_install.outputs.status == '0'
+        working-directory: mobile
+        shell: bash
+        run: |
+          set +e
+          npm run typecheck > typecheck.log 2>&1
+          status=$?
+          set -e
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          cat typecheck.log
+          exit 0
+
+      - name: Check Expo dependency versions
+        id: expo_check
+        if: steps.clean_install.outputs.status == '0'
+        working-directory: mobile
+        shell: bash
+        run: |
+          set +e
+          npx expo install --check > expo-install-check.log 2>&1
+          status=$?
+          set -e
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          cat expo-install-check.log
+          exit 0
+
+      - name: Run Expo Doctor
+        id: doctor
+        if: steps.clean_install.outputs.status == '0'
+        working-directory: mobile
+        shell: bash
+        run: |
+          set +e
+          npm run doctor > expo-doctor.log 2>&1
+          status=$?
+          set -e
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          cat expo-doctor.log
+          exit 0
+
+      - name: Resolve Expo config and bundle iOS JavaScript
+        id: bundle
+        if: steps.clean_install.outputs.status == '0'
+        working-directory: mobile
+        shell: bash
+        run: |
+          set +e
+          {
+            npx expo config --type public
+            npx expo export --platform ios --output-dir dist-lock-ci
+          } > expo-bundle.log 2>&1
+          status=$?
+          set -e
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          cat expo-bundle.log
+          exit 0
+
+      - name: Upload lockfile and compatibility diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -63,20 +122,20 @@ jobs:
           path: |
             mobile/package-lock.json
             mobile/npm-ci.log
-          if-no-files-found: error
+            mobile/typecheck.log
+            mobile/expo-install-check.log
+            mobile/expo-doctor.log
+            mobile/expo-bundle.log
+          if-no-files-found: warn
           retention-days: 3
 
-      - name: Run mobile checks
-        if: steps.clean_install.outputs.status == '0'
-        working-directory: mobile
-        run: |
-          npm run typecheck
-          npm run doctor
-          npx expo config --type public
-          npx expo export --platform ios --output-dir dist-lock-ci
-
       - name: Commit the lockfile
-        if: steps.clean_install.outputs.status == '0'
+        if: >-
+          steps.clean_install.outputs.status == '0' &&
+          steps.typecheck.outputs.status == '0' &&
+          steps.expo_check.outputs.status == '0' &&
+          steps.doctor.outputs.status == '0' &&
+          steps.bundle.outputs.status == '0'
         shell: bash
         run: |
           if git diff --quiet -- mobile/package-lock.json; then
@@ -90,9 +149,25 @@ jobs:
           git commit -m "Lock mobile dependencies for reproducible EAS builds"
           git push origin HEAD:fix/ios-install-dependencies
 
-      - name: Fail if the clean install failed
-        if: steps.clean_install.outputs.status != '0'
-        working-directory: mobile
+      - name: Report compatibility check result
+        shell: bash
         run: |
-          cat npm-ci.log
-          exit 1
+          echo "npm ci: ${CI_STATUS:-missing}"
+          echo "typecheck: ${TYPECHECK_STATUS:-missing}"
+          echo "expo install --check: ${EXPO_CHECK_STATUS:-missing}"
+          echo "expo doctor: ${DOCTOR_STATUS:-missing}"
+          echo "iOS bundle: ${BUNDLE_STATUS:-missing}"
+
+          if [ "${CI_STATUS}" != "0" ] || \
+             [ "${TYPECHECK_STATUS}" != "0" ] || \
+             [ "${EXPO_CHECK_STATUS}" != "0" ] || \
+             [ "${DOCTOR_STATUS}" != "0" ] || \
+             [ "${BUNDLE_STATUS}" != "0" ]; then
+            exit 1
+          fi
+        env:
+          CI_STATUS: ${{ steps.clean_install.outputs.status }}
+          TYPECHECK_STATUS: ${{ steps.typecheck.outputs.status }}
+          EXPO_CHECK_STATUS: ${{ steps.expo_check.outputs.status }}
+          DOCTOR_STATUS: ${{ steps.doctor.outputs.status }}
+          BUNDLE_STATUS: ${{ steps.bundle.outputs.status }}
