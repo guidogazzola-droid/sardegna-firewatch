@@ -2,6 +2,11 @@ name: Bootstrap EAS project
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - chore/run-eas-bootstrap-20260722
+    paths:
+      - ".github/workflows/eas-bootstrap.yml"
 
 permissions:
   contents: write
