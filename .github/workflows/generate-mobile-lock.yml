@@ -43,10 +43,31 @@ jobs:
           npm install --package-lock-only --include=dev --no-audit --no-fund
 
       - name: Verify the same clean install used by EAS Build
+        id: clean_install
         working-directory: mobile
-        run: npm ci --include=dev --no-audit --no-fund
+        shell: bash
+        run: |
+          set +e
+          npm ci --include=dev --no-audit --no-fund > npm-ci.log 2>&1
+          status=$?
+          set -e
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          cat npm-ci.log
+          exit 0
+
+      - name: Upload lockfile diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-lockfile-${{ github.run_id }}
+          path: |
+            mobile/package-lock.json
+            mobile/npm-ci.log
+          if-no-files-found: error
+          retention-days: 3
 
       - name: Run mobile checks
+        if: steps.clean_install.outputs.status == '0'
         working-directory: mobile
         run: |
           npm run typecheck
@@ -55,6 +76,7 @@ jobs:
           npx expo export --platform ios --output-dir dist-lock-ci
 
       - name: Commit the lockfile
+        if: steps.clean_install.outputs.status == '0'
         shell: bash
         run: |
           if git diff --quiet -- mobile/package-lock.json; then
@@ -67,3 +89,10 @@ jobs:
           git add mobile/package-lock.json
           git commit -m "Lock mobile dependencies for reproducible EAS builds"
           git push origin HEAD:fix/ios-install-dependencies
+
+      - name: Fail if the clean install failed
+        if: steps.clean_install.outputs.status != '0'
+        working-directory: mobile
+        run: |
+          cat npm-ci.log
+          exit 1
