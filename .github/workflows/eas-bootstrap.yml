@@ -32,7 +32,7 @@ jobs:
         shell: bash
         run: |
           if [ -z "$EXPO_TOKEN" ]; then
-            echo "::error::The repository secret EXPO_TOKEN is missing. Create a personal access token at expo.dev/settings/access-tokens and save it in GitHub Actions secrets as EXPO_TOKEN."
+            echo "::error::The repository secret EXPO_TOKEN is missing. Create an Expo access token and save it in GitHub Actions secrets as EXPO_TOKEN."
             exit 1
           fi
 
@@ -58,7 +58,7 @@ jobs:
           normalized="$(printf '%s' "$account" | tr '[:upper:]' '[:lower:]')"
           echo "Authenticated with Expo as: $account"
           if [ "$normalized" != "camerun" ]; then
-            echo "::error::EXPO_TOKEN belongs to '$account', but this app is configured for Expo owner 'Camerun'."
+            echo "::error::EXPO_TOKEN belongs to '$account', but this app is configured for Expo owner 'camerun'."
             exit 1
           fi
 
@@ -165,7 +165,7 @@ jobs:
           cat > "$body_file" <<EOF
           ## Obiettivo
 
-          Collega Sardinia FireWatch al progetto Expo EAS creato per l'account \`Camerun\`.
+          Collega Sardinia FireWatch al progetto Expo EAS creato per l'account \`camerun\`.
 
           ## Modifica
 
@@ -201,10 +201,10 @@ jobs:
           {
             echo "## Sardinia FireWatch EAS bootstrap"
             echo
-            echo "- Expo owner: \`Camerun\`"
+            echo "- Expo owner: \`camerun\`"
             echo "- Project slug: \`sardinia-firewatch\`"
             echo "- EAS project ID: \`$PROJECT_ID\`"
-            echo "- Dashboard: https://expo.dev/accounts/Camerun/projects/sardinia-firewatch"
+            echo "- Dashboard: https://expo.dev/accounts/camerun/projects/sardinia-firewatch"
             echo
             if [ "${{ steps.commit.outputs.changed }}" = "true" ]; then
               echo "A review branch was created with the generated project ID."
