@@ -1,0 +1,64 @@
+name: Generate mobile dependency lockfile
+
+on:
+  push:
+    branches:
+      - fix/ios-install-dependencies
+    paths:
+      - "mobile/package.json"
+      - ".github/workflows/generate-mobile-lock.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: mobile-lockfile-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out the repair branch
+        uses: actions/checkout@v5
+        with:
+          ref: fix/ios-install-dependencies
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.16.0"
+
+      - name: Generate a clean npm lockfile
+        working-directory: mobile
+        run: |
+          rm -f package-lock.json
+          npm install --package-lock-only --include=dev --no-audit --no-fund
+
+      - name: Verify the same clean install used by EAS Build
+        working-directory: mobile
+        run: npm ci --include=dev --no-audit --no-fund
+
+      - name: Run mobile checks
+        working-directory: mobile
+        run: |
+          npm run typecheck
+          npm run doctor
+          npx expo config --type public
+          npx expo export --platform ios --output-dir dist-lock-ci
+
+      - name: Commit the lockfile
+        shell: bash
+        run: |
+          if git diff --quiet -- mobile/package-lock.json; then
+            echo "The lockfile is already current."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add mobile/package-lock.json
+          git commit -m "Lock mobile dependencies for reproducible EAS builds"
+          git push origin HEAD:fix/ios-install-dependencies
