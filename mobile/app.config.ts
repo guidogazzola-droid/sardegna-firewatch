@@ -9,7 +9,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: "Sardinia FireWatch",
   slug: "sardinia-firewatch",
-  owner: "Camerun",
+  owner: "camerun",
   scheme: "sardiniafirewatch",
   version: "0.1.0",
   orientation: "portrait",
