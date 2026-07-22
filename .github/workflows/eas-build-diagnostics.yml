@@ -37,30 +37,51 @@ jobs:
             exit 1
           fi
 
-      - name: Read build metadata
+      - name: Capture EAS CLI diagnostics
         working-directory: mobile
         shell: bash
         run: |
-          set -o pipefail
-          npx --yes eas-cli@latest build:view 8ef68970-12e5-4d27-8e34-720da16878f5 --json \
-            > "$RUNNER_TEMP/eas-build-view.json" \
-            2> "$RUNNER_TEMP/eas-build-view.stderr"
+          output="$RUNNER_TEMP/eas-build-logs"
+          mkdir -p "$output"
 
-      - name: Download available build logs
+          npx --yes eas-cli@latest --version > "$output/eas-version.txt" 2>&1 || true
+          npx --yes eas-cli@latest whoami > "$output/whoami.txt" 2>&1 || true
+          npx --yes eas-cli@latest project:info > "$output/project-info.txt" 2>&1 || true
+          npx --yes eas-cli@latest build:view --help > "$output/build-view-help.txt" 2>&1 || true
+
+          set +e
+          EXPO_DEBUG=1 EAS_DEBUG=1 npx --yes eas-cli@latest build:view \
+            8ef68970-12e5-4d27-8e34-720da16878f5 --json \
+            > "$output/build-view.stdout" \
+            2> "$output/build-view.stderr"
+          status=$?
+          set -e
+          printf '%s\n' "$status" > "$output/build-view.exit-status.txt"
+          echo "build:view exit status: $status"
+
+      - name: Download log resources from build metadata
         shell: bash
         run: |
           node <<'NODE'
           const fs = require('node:fs');
           const path = require('node:path');
 
-          const temp = process.env.RUNNER_TEMP;
-          const source = path.join(temp, 'eas-build-view.json');
-          const outputDir = path.join(temp, 'eas-build-logs');
-          fs.mkdirSync(outputDir, { recursive: true });
+          const outputDir = path.join(process.env.RUNNER_TEMP, 'eas-build-logs');
+          const source = path.join(outputDir, 'build-view.stdout');
+          if (!fs.existsSync(source)) process.exit(0);
 
-          const data = JSON.parse(fs.readFileSync(source, 'utf8'));
+          const raw = fs.readFileSync(source, 'utf8').trim();
+          if (!raw) process.exit(0);
+
+          let data;
+          try {
+            data = JSON.parse(raw);
+          } catch (error) {
+            fs.writeFileSync(path.join(outputDir, 'json-parse-error.txt'), String(error));
+            process.exit(0);
+          }
+
           const urls = [];
-
           function walk(value, trail = []) {
             if (typeof value === 'string' && /^https:\/\//.test(value)) {
               const label = trail.join('.').toLowerCase();
@@ -90,7 +111,6 @@ jobs:
               logUrlLabels: urls.map((item) => item.label),
             }, null, 2),
           );
-          fs.copyFileSync(source, path.join(outputDir, 'build-view.json'));
 
           Promise.all(urls.map(async ({ label, url }, index) => {
             const response = await fetch(url);
@@ -103,19 +123,9 @@ jobs:
           })).then(() => {
             console.log(`Downloaded ${urls.length} log resource(s).`);
           }).catch((error) => {
-            console.error(error);
-            process.exitCode = 1;
+            fs.writeFileSync(path.join(outputDir, 'log-download-error.txt'), String(error));
           });
           NODE
-
-      - name: Include command diagnostics
-        if: always()
-        shell: bash
-        run: |
-          mkdir -p "$RUNNER_TEMP/eas-build-logs"
-          if [ -f "$RUNNER_TEMP/eas-build-view.stderr" ]; then
-            cp "$RUNNER_TEMP/eas-build-view.stderr" "$RUNNER_TEMP/eas-build-logs/command.stderr"
-          fi
 
       - name: Upload diagnostics
         if: always()
