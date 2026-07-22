@@ -1,6 +1,14 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import type { ConfigContext, ExpoConfig } from "expo/config";
-import easProject from "./eas-project.json";
 
+interface EasProjectMetadata {
+  projectId: string | null;
+}
+
+const easProject = JSON.parse(
+  readFileSync(resolve(process.cwd(), "eas-project.json"), "utf8"),
+) as EasProjectMetadata;
 const EAS_PROJECT_ID = easProject.projectId;
 const API_BASE_URL =
   process.env.EXPO_PUBLIC_API_BASE_URL ?? "https://sardegna-firewatch.onrender.com";
