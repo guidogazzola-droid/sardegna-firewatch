@@ -138,7 +138,7 @@ jobs:
           steps.bundle.outputs.status == '0'
         shell: bash
         run: |
-          if git diff --quiet -- mobile/package-lock.json; then
+          if [ -z "$(git status --porcelain -- mobile/package-lock.json)" ]; then
             echo "The lockfile is already current."
             exit 0
           fi
