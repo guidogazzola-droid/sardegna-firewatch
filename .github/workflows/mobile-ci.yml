@@ -29,12 +29,17 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "22.16.0"
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
 
-      - name: Install dependencies
-        run: npm install --no-audit --no-fund
+      - name: Install locked dependencies
+        run: npm ci --include=dev --no-audit --no-fund
 
       - name: Type-check
         run: npm run typecheck
+
+      - name: Check Expo dependency versions
+        run: npx expo install --check
 
       - name: Check Expo dependencies and configuration
         run: npm run doctor
