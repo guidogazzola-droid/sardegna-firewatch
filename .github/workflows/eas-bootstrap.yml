@@ -1,5 +1,6 @@
 name: Bootstrap EAS project
 
+# One-time retry after fixing the dynamic Expo config loader.
 on:
   workflow_dispatch:
   push:
