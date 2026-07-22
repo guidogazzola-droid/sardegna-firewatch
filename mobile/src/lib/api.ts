@@ -1,5 +1,12 @@
 import { API_BASE_URL } from "./config";
-import type { FireFeedResponse, SystemStatusResponse } from "./types";
+import type {
+  CloudForecastResponse,
+  FireFeedResponse,
+  GeoBounds,
+  SystemStatusResponse,
+  WindGridResponse,
+  WindHistoryResponse,
+} from "./types";
 
 export type FireSourceGroup = "viirs" | "modis" | "all";
 
@@ -66,4 +73,47 @@ export function fetchFireFeed(
   });
 
   return requestJson<FireFeedResponse>(`/api/fires?${query.toString()}`, options.signal);
+}
+
+export function fetchWindGrid(
+  options: {
+    bounds: GeoBounds;
+    rows?: number;
+    columns?: number;
+    signal?: AbortSignal;
+  },
+): Promise<WindGridResponse> {
+  const rows = Math.min(5, Math.max(2, Math.round(options.rows ?? 4)));
+  const columns = Math.min(6, Math.max(2, Math.round(options.columns ?? 5)));
+  const query = new URLSearchParams({
+    south: options.bounds.south.toFixed(4),
+    west: options.bounds.west.toFixed(4),
+    north: options.bounds.north.toFixed(4),
+    east: options.bounds.east.toFixed(4),
+    rows: String(rows),
+    columns: String(columns),
+  });
+
+  return requestJson<WindGridResponse>(`/api/wind-grid?${query.toString()}`, options.signal);
+}
+
+export function fetchCloudForecast(signal?: AbortSignal): Promise<CloudForecastResponse> {
+  return requestJson<CloudForecastResponse>("/api/cloud-forecast", signal);
+}
+
+export function fetchWindHistory(
+  options: {
+    latitude: number;
+    longitude: number;
+    startAt: string;
+    signal?: AbortSignal;
+  },
+): Promise<WindHistoryResponse> {
+  const query = new URLSearchParams({
+    lat: String(options.latitude),
+    lon: String(options.longitude),
+    start: options.startAt,
+  });
+
+  return requestJson<WindHistoryResponse>(`/api/wind-history?${query.toString()}`, options.signal);
 }
