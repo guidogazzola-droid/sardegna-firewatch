@@ -17,7 +17,7 @@ const easProject = JSON.parse(
 const EAS_PROJECT_ID = easProject.projectId;
 const APP_DISPLAY_NAME = configuredText(
   process.env.EXPO_PUBLIC_APP_DISPLAY_NAME,
-  "Sardinia FireWatch",
+  "Sabetta Piro \u2014 Wildfire Alerts",
 );
 const API_BASE_URL =
   process.env.EXPO_PUBLIC_API_BASE_URL ?? "https://sardegna-firewatch.onrender.com";
@@ -28,13 +28,12 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   slug: "sardinia-firewatch",
   owner: "camerun",
   scheme: "sardiniafirewatch",
-  version: "0.1.0",
+  version: "0.2.0",
   orientation: "portrait",
   userInterfaceStyle: "automatic",
   ios: {
     supportsTablet: false,
     bundleIdentifier: "com.guidogazzola.sardiniafirewatch",
-    buildNumber: "1",
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
     },
