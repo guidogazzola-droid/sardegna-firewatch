@@ -69,30 +69,57 @@ jobs:
           echo "status=$status" >> "$GITHUB_OUTPUT"
           exit 0
 
-      - name: Run Expo Doctor
+      - name: Capture Expo Doctor
+        id: doctor
         working-directory: mobile
-        run: npm run doctor
+        shell: bash
+        run: |
+          set +e
+          npm run doctor > expo-doctor.log 2>&1
+          status=$?
+          set -e
+          cat expo-doctor.log
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          exit 0
 
-      - name: Resolve Expo config
+      - name: Capture Expo config and iOS bundle
+        id: bundle
         working-directory: mobile
-        run: npx expo config --type public
+        shell: bash
+        run: |
+          set +e
+          {
+            npx expo config --type public
+            npx expo export --platform ios --output-dir dist-weather-ci
+          } > expo-bundle.log 2>&1
+          status=$?
+          set -e
+          cat expo-bundle.log
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          exit 0
 
-      - name: Bundle iOS JavaScript
-        working-directory: mobile
-        run: npx expo export --platform ios --output-dir dist-weather-ci
-
-      - name: Upload Expo diagnostics
+      - name: Upload mobile diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: weather-expo-check-${{ github.run_id }}
-          path: mobile/expo-install-check.log
+          name: weather-mobile-diagnostics-${{ github.run_id }}
+          path: |
+            mobile/expo-install-check.log
+            mobile/expo-doctor.log
+            mobile/expo-bundle.log
           if-no-files-found: error
           retention-days: 3
 
-      - name: Report Expo dependency result
-        if: steps.expo_check.outputs.status != '0'
-        working-directory: mobile
+      - name: Report mobile compatibility result
+        shell: bash
+        env:
+          EXPO_CHECK_STATUS: ${{ steps.expo_check.outputs.status }}
+          DOCTOR_STATUS: ${{ steps.doctor.outputs.status }}
+          BUNDLE_STATUS: ${{ steps.bundle.outputs.status }}
         run: |
-          cat expo-install-check.log
-          exit 1
+          echo "expo install --check: $EXPO_CHECK_STATUS"
+          echo "expo doctor: $DOCTOR_STATUS"
+          echo "iOS bundle: $BUNDLE_STATUS"
+          if [ "$EXPO_CHECK_STATUS" != "0" ] || [ "$DOCTOR_STATUS" != "0" ] || [ "$BUNDLE_STATUS" != "0" ]; then
+            exit 1
+          fi
