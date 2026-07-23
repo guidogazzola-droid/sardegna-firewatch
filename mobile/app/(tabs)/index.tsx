@@ -19,6 +19,7 @@ import { useFireData } from "../../src/context/fire-data";
 import { useWeatherLayers } from "../../src/hooks/use-weather-layers";
 import { fetchWindHistory } from "../../src/lib/api";
 import {
+  APP_DISPLAY_NAME,
   SARDINIA_BOUNDS,
   SARDINIA_CENTER,
   SARDINIA_INITIAL_ZOOM,
@@ -233,7 +234,7 @@ export default function MapScreen() {
       <View style={styles.header}>
         <View style={styles.headerText}>
           <Text style={[styles.eyebrow, { color: theme.accent }]}>SARDEGNA</Text>
-          <Text style={[styles.title, { color: theme.text }]}>Sardinia FireWatch</Text>
+          <Text style={[styles.title, { color: theme.text }]}>{APP_DISPLAY_NAME}</Text>
           <Text style={[styles.subtitle, { color: theme.textMuted }]}>Incendi, vento e nuvolosita in un'unica vista</Text>
         </View>
         <Pressable
