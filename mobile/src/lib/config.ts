@@ -11,4 +11,10 @@ export const MAP_STYLE_URL =
 
 export const SARDINIA_CENTER: [number, number] = [9.05, 40.02];
 export const SARDINIA_INITIAL_ZOOM = 7;
+export const SARDINIA_BOUNDS = {
+  west: 7.7,
+  south: 38.7,
+  east: 10.2,
+  north: 41.4,
+} as const;
 export const DEFAULT_REFRESH_SECONDS = 300;
