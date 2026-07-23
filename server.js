@@ -44,9 +44,17 @@ app.use(
     contentSecurityPolicy: false,
     crossOriginEmbedderPolicy: false,
     crossOriginResourcePolicy: { policy: "cross-origin" },
+    frameguard: false,
   }),
 );
 app.use(express.json({ limit: "32kb" }));
+app.use((_request, response, next) => {
+  response.setHeader(
+    "Content-Security-Policy",
+    "frame-ancestors 'self' https://sabetta-works.onrender.com https://sabetta-works.area-di-lavo-7588.chatgpt.site",
+  );
+  next();
+});
 
 app.get("/api/health", (_request, response) => {
   response.json({ ok: true, now: new Date().toISOString() });
