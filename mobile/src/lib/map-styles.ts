@@ -1,4 +1,4 @@
-import type { StyleSpecification } from "@maplibre/maplibre-react-native";
+import { MAP_STYLE_URL } from "./config";
 
 export type BaseMapId = "satellite" | "topographic" | "street";
 
@@ -6,49 +6,25 @@ export interface BaseMapDefinition {
   id: BaseMapId;
   label: string;
   shortLabel: string;
-  style: StyleSpecification;
+  style: string;
+  attribution: string;
+  available: boolean;
 }
 
-function rasterStyle(options: {
-  id: string;
-  tileUrl: string;
-  attribution: string;
-  maxzoom?: number;
-}): StyleSpecification {
-  return {
-    version: 8,
-    name: options.id,
-    sources: {
-      [options.id]: {
-        type: "raster",
-        tiles: [options.tileUrl],
-        tileSize: 256,
-        minzoom: 0,
-        maxzoom: options.maxzoom ?? 18,
-        attribution: options.attribution,
-      },
-    },
-    layers: [
-      {
-        id: `${options.id}-background`,
-        type: "background",
-        paint: {
-          "background-color": "#dfe7eb",
-        },
-      },
-      {
-        id: `${options.id}-tiles`,
-        type: "raster",
-        source: options.id,
-        minzoom: 0,
-        maxzoom: options.maxzoom ?? 18,
-        paint: {
-          "raster-opacity": 1,
-          "raster-fade-duration": 180,
-        },
-      },
-    ],
-  };
+const arcgisAccessToken = String(
+  process.env.EXPO_PUBLIC_ARCGIS_ACCESS_TOKEN ?? "",
+).trim();
+
+export const ARCGIS_BASEMAPS_CONFIGURED = arcgisAccessToken.length > 0;
+
+function arcgisStyle(styleName: string): string {
+  if (!ARCGIS_BASEMAPS_CONFIGURED) return MAP_STYLE_URL;
+  const query = new URLSearchParams({
+    language: "it",
+    places: "attributed",
+    token: arcgisAccessToken,
+  });
+  return `https://basemapstyles-api.arcgis.com/arcgis/rest/services/styles/v2/styles/arcgis/${styleName}?${query.toString()}`;
 }
 
 export const BASE_MAPS: Record<BaseMapId, BaseMapDefinition> = {
@@ -56,38 +32,27 @@ export const BASE_MAPS: Record<BaseMapId, BaseMapDefinition> = {
     id: "satellite",
     label: "Satellite",
     shortLabel: "SAT",
-    style: rasterStyle({
-      id: "esri-world-imagery",
-      tileUrl:
-        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-      attribution: "Tiles © Esri, Maxar, Earthstar Geographics, and the GIS User Community",
-      maxzoom: 19,
-    }),
+    style: arcgisStyle("imagery"),
+    attribution: "Powered by Esri · fonti dati indicate nella mappa",
+    available: ARCGIS_BASEMAPS_CONFIGURED,
   },
   topographic: {
     id: "topographic",
     label: "Topografica",
     shortLabel: "TOPO",
-    style: rasterStyle({
-      id: "esri-world-topographic",
-      tileUrl:
-        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}",
-      attribution: "Tiles © Esri and contributors",
-      maxzoom: 18,
-    }),
+    style: arcgisStyle("topographic"),
+    attribution: "Powered by Esri · fonti dati indicate nella mappa",
+    available: ARCGIS_BASEMAPS_CONFIGURED,
   },
   street: {
     id: "street",
     label: "Stradale",
     shortLabel: "STR",
-    style: rasterStyle({
-      id: "esri-world-street",
-      tileUrl:
-        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",
-      attribution: "Tiles © Esri and contributors",
-      maxzoom: 19,
-    }),
+    style: arcgisStyle("streets"),
+    attribution: "Powered by Esri · fonti dati indicate nella mappa",
+    available: ARCGIS_BASEMAPS_CONFIGURED,
   },
 };
 
 export const DEFAULT_BASE_MAP_ID: BaseMapId = "satellite";
+export const FALLBACK_MAP_ATTRIBUTION = "Mappa demo MapLibre · non destinata al rilascio commerciale";
