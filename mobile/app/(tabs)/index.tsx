@@ -16,6 +16,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFireData } from "../../src/context/fire-data";
+import { useBasemapStyle } from "../../src/hooks/use-basemap-style";
 import { useWeatherLayers } from "../../src/hooks/use-weather-layers";
 import { fetchWindHistory } from "../../src/lib/api";
 import {
@@ -105,6 +106,13 @@ export default function MapScreen() {
 
   const visibleFires = fires.slice(0, 100);
   const baseMap = BASE_MAPS[baseMapId];
+  const {
+    mapStyle: resolvedMapStyle,
+    loading: isBasemapLoading,
+    usingFallback: isUsingFallbackMap,
+    error: basemapError,
+    handleNativeFailure,
+  } = useBasemapStyle(baseMap.style, ARCGIS_BASEMAPS_CONFIGURED);
 
   const cloudGeoJson = useMemo<GeoJSON.FeatureCollection<GeoJSON.Point>>(
     () => ({
@@ -240,7 +248,7 @@ export default function MapScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Aggiorna tutti i dati"
-          disabled={isRefreshing || isWindLoading || isCloudLoading}
+          disabled={isRefreshing || isWindLoading || isCloudLoading || isBasemapLoading}
           onPress={() => void refreshAll()}
           style={({ pressed }) => [
             styles.refreshButton,
@@ -251,7 +259,7 @@ export default function MapScreen() {
             },
           ]}
         >
-          {isRefreshing || isWindLoading || isCloudLoading ? (
+          {isRefreshing || isWindLoading || isCloudLoading || isBasemapLoading ? (
             <ActivityIndicator color={theme.accent} />
           ) : (
             <Text style={[styles.refreshText, { color: theme.accent }]}>↻</Text>
@@ -323,24 +331,29 @@ export default function MapScreen() {
         />
       </View>
 
-      {!ARCGIS_BASEMAPS_CONFIGURED ? (
+      {basemapError ? (
         <Text style={[styles.configurationNotice, { color: theme.warning }]}>
-          Basemap professionali non ancora configurate: la build di sviluppo usa la mappa di riserva.
+          {basemapError}
+        </Text>
+      ) : isUsingFallbackMap ? (
+        <Text style={[styles.configurationNotice, { color: theme.warning }]}>
+          Mappa OpenFreeMap attiva come riserva.
         </Text>
       ) : null}
 
       <View style={[styles.mapFrame, { borderColor: theme.border, backgroundColor: theme.surfaceMuted }]}>
         <Map
-          key={baseMapId}
+          key={`${baseMapId}-${isUsingFallbackMap ? "fallback" : "arcgis"}`}
           ref={mapRef}
           style={styles.map}
-          mapStyle={baseMap.style}
+          mapStyle={resolvedMapStyle}
           attribution
           attributionPosition={{ bottom: 8, right: 8 }}
           compass
           compassPosition={{ top: 10, right: 10 }}
           scaleBar
           scaleBarPosition={{ bottom: 10, left: 10 }}
+          onDidFailLoadingMap={handleNativeFailure}
           onRegionDidChange={(event) => scheduleWindRefresh(event.nativeEvent.bounds)}
         >
           <Camera
@@ -450,7 +463,7 @@ export default function MapScreen() {
           ))}
         </Map>
 
-        {isLoading ? (
+        {isLoading || isBasemapLoading ? (
           <View style={[styles.loadingOverlay, { backgroundColor: `${theme.background}d9` }]}>
             <ActivityIndicator size="large" color={theme.accent} />
             <Text style={[styles.loadingText, { color: theme.text }]}>Caricamento della mappa...</Text>
@@ -459,7 +472,7 @@ export default function MapScreen() {
 
         <View style={[styles.mapAttribution, { backgroundColor: `${theme.surface}df` }]}>
           <Text style={[styles.mapAttributionText, { color: theme.textMuted }]} numberOfLines={1}>
-            {ARCGIS_BASEMAPS_CONFIGURED ? baseMap.attribution : FALLBACK_MAP_ATTRIBUTION}
+            {isUsingFallbackMap ? FALLBACK_MAP_ATTRIBUTION : baseMap.attribution}
           </Text>
         </View>
 
