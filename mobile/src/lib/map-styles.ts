@@ -17,11 +17,20 @@ const arcgisAccessToken = String(
 
 export const ARCGIS_BASEMAPS_CONFIGURED = arcgisAccessToken.length > 0;
 
+// OpenFreeMap explicitly supports MapLibre Native/mobile applications and
+// commercial usage with attribution. It is used only when the ArcGIS style
+// cannot be authorized or loaded, so the user never receives a blank map.
+export const FALLBACK_MAP_STYLE_URL =
+  process.env.EXPO_PUBLIC_FALLBACK_MAP_STYLE_URL ??
+  "https://tiles.openfreemap.org/styles/liberty";
+
 function arcgisStyle(styleName: string): string {
   if (!ARCGIS_BASEMAPS_CONFIGURED) return MAP_STYLE_URL;
   const query = new URLSearchParams({
+    f: "json",
     language: "it",
-    places: "attributed",
+    places: "none",
+    echoToken: "true",
     token: arcgisAccessToken,
   });
   return `https://basemapstyles-api.arcgis.com/arcgis/rest/services/styles/v2/styles/arcgis/${styleName}?${query.toString()}`;
@@ -55,4 +64,5 @@ export const BASE_MAPS: Record<BaseMapId, BaseMapDefinition> = {
 };
 
 export const DEFAULT_BASE_MAP_ID: BaseMapId = "satellite";
-export const FALLBACK_MAP_ATTRIBUTION = "Mappa demo MapLibre · non destinata al rilascio commerciale";
+export const FALLBACK_MAP_ATTRIBUTION =
+  "OpenFreeMap · OpenMapTiles · © OpenStreetMap contributors";
