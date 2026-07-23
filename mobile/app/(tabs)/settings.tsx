@@ -1,7 +1,7 @@
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFireData } from "../../src/context/fire-data";
-import { API_BASE_URL } from "../../src/lib/config";
+import { API_BASE_URL, APP_DISPLAY_NAME } from "../../src/lib/config";
 import { spacing, useAppTheme } from "../../src/theme";
 
 export default function SettingsScreen() {
@@ -52,7 +52,7 @@ export default function SettingsScreen() {
         </Section>
 
         <Section title="Uso corretto dei dati">
-          <Text style={[styles.body, { color: theme.text }]}>Sardinia FireWatch e uno strumento informativo, non un sistema ufficiale di emergenza.</Text>
+          <Text style={[styles.body, { color: theme.text }]}>{APP_DISPLAY_NAME} e uno strumento informativo, non un sistema ufficiale di emergenza.</Text>
           <Text style={[styles.body, { color: theme.textMuted }]}>Una rilevazione termica satellitare puo essere incompleta, ritardata o dovuta a una sorgente di calore diversa da un incendio. Vento, nuvole e traiettorie sono dati modellati o stime e non sostituiscono le comunicazioni delle autorita competenti.</Text>
           <View style={[styles.emergency, { backgroundColor: `${theme.danger}15`, borderColor: `${theme.danger}50` }]}>
             <Text style={[styles.emergencyTitle, { color: theme.danger }]}>In presenza di fumo o fiamme</Text>
@@ -68,6 +68,7 @@ export default function SettingsScreen() {
         </Section>
 
         <Section title="Versione tecnica">
+          <MetaRow label="Nome pubblico" value={APP_DISPLAY_NAME} />
           <MetaRow label="App" value="0.1.0" />
           <MetaRow label="Bundle ID" value="com.guidogazzola.sardiniafirewatch" />
           <MetaRow label="Backend" value={API_BASE_URL} />
@@ -81,7 +82,7 @@ export default function SettingsScreen() {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   const theme = useAppTheme();
   return (
-    <View style={[styles.section, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+    <View style={[styles.section, { backgroundColor: theme.surface, borderColor: theme.border }]}> 
       <Text style={[styles.sectionTitle, { color: theme.text }]}>{title}</Text>
       {children}
     </View>
