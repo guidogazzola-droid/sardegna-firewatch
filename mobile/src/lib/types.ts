@@ -72,6 +72,7 @@ export interface WindGridResponse {
   ok: boolean;
   generatedAt: string;
   source: string;
+  sourceMode?: "evaluation" | "commercial";
   units: {
     speed: string;
     direction: string;
@@ -100,6 +101,7 @@ export interface CloudForecastResponse {
   ok: boolean;
   generatedAt: string;
   source: string;
+  sourceMode?: "evaluation" | "commercial";
   methodology: string;
   bounds: GeoBounds;
   frames: CloudFrame[];
@@ -127,6 +129,7 @@ export interface WindHistorySummary {
 export interface WindHistoryResponse {
   ok: boolean;
   generatedAt: string;
+  sourceMode?: "evaluation" | "commercial";
   requestedStartAt: string;
   startAt: string;
   endAt: string;
@@ -146,12 +149,20 @@ export interface WindHistoryResponse {
   cached?: boolean;
 }
 
+export interface WeatherServiceStatus {
+  provider: string;
+  mode: "evaluation" | "commercial";
+  commercialReady: boolean;
+  commercialRequired: boolean;
+}
+
 export interface SystemStatusResponse {
   ok: boolean;
   mode: string;
   firmsConfigured: boolean;
   refreshSeconds: number;
   bbox: GeoBounds;
+  weatherService?: WeatherServiceStatus;
   sources: {
     effis: boolean;
     firms: boolean;
