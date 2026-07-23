@@ -9,8 +9,10 @@ function configuredText(value: string | undefined, fallback: string): string {
 
 export const APP_DISPLAY_NAME = configuredText(
   process.env.EXPO_PUBLIC_APP_DISPLAY_NAME,
-  "Sardinia FireWatch",
+  "Sabetta Piro \u2014 Wildfire Alerts",
 );
+
+export const APP_VERSION = "0.2.0";
 
 export const API_BASE_URL = withoutTrailingSlash(
   process.env.EXPO_PUBLIC_API_BASE_URL ?? "https://sardegna-firewatch.onrender.com",
