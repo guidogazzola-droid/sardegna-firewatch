@@ -14,6 +14,10 @@ import {
 import { fetchFirmsFires } from "./lib/firms.js";
 import { fetchCloudForecast } from "./lib/cloud.js";
 import {
+  buildOpenMeteoForecastUrl,
+  publicOpenMeteoStatus,
+} from "./lib/open-meteo.js";
+import {
   buildWindGridPoints,
   fetchCurrentWindGrid,
   fetchWindHistory,
@@ -29,6 +33,8 @@ const cache = new TtlCache();
 const port = Number.parseInt(process.env.PORT || "3000", 10);
 const cacheTtlMs = Number.parseInt(process.env.CACHE_TTL_MS || String(DEFAULT_CACHE_TTL_MS), 10);
 const firmsMapKey = String(process.env.FIRMS_MAP_KEY || "").trim();
+const weatherService = publicOpenMeteoStatus();
+const weatherConfigured = !weatherService.commercialRequired || weatherService.commercialReady;
 
 app.disable("x-powered-by");
 app.set("trust proxy", 1);
@@ -54,13 +60,14 @@ app.get("/api/status", (_request, response) => {
     firmsConfigured: Boolean(firmsMapKey),
     refreshSeconds: DEFAULT_REFRESH_SECONDS,
     bbox: SARDINIA_BBOX,
+    weatherService,
     sources: {
       effis: true,
       firms: Boolean(firmsMapKey),
-      weather: true,
-      windMap: true,
-      windHistory: true,
-      cloudForecast: true,
+      weather: weatherConfigured,
+      windMap: weatherConfigured,
+      windHistory: weatherConfigured,
+      cloudForecast: weatherConfigured,
     },
   });
 });
@@ -155,7 +162,7 @@ app.get("/api/weather", async (request, response) => {
   });
 
   try {
-    const upstream = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`, {
+    const upstream = await fetch(buildOpenMeteoForecastUrl(params), {
       headers: { Accept: "application/json" },
       signal: AbortSignal.timeout(12_000),
     });
@@ -164,6 +171,8 @@ app.get("/api/weather", async (request, response) => {
     const payload = {
       ok: true,
       generatedAt: new Date().toISOString(),
+      source: "Open-Meteo",
+      sourceMode: weatherService.mode,
       current: data.current ?? null,
       currentUnits: data.current_units ?? null,
       daily: data.daily ?? null,
@@ -173,7 +182,11 @@ app.get("/api/weather", async (request, response) => {
     return response.json({ ...payload, cached: false });
   } catch (error) {
     console.error("Weather request failed:", error);
-    return response.status(502).json({ ok: false, error: "Meteo locale temporaneamente non disponibile." });
+    return response.status(502).json({
+      ok: false,
+      error: "Meteo locale temporaneamente non disponibile.",
+      details: process.env.NODE_ENV === "development" ? error.message : undefined,
+    });
   }
 });
 
@@ -216,6 +229,7 @@ app.get("/api/wind-grid", async (request, response) => {
       ok: true,
       generatedAt: new Date().toISOString(),
       source: "Open-Meteo",
+      sourceMode: weatherService.mode,
       units: { speed: "km/h", direction: "°" },
       bounds,
       samples,
@@ -224,7 +238,11 @@ app.get("/api/wind-grid", async (request, response) => {
     return response.json({ ...payload, cached: false });
   } catch (error) {
     console.error("Wind grid request failed:", error);
-    return response.status(502).json({ ok: false, error: "Mappa del vento temporaneamente non disponibile." });
+    return response.status(502).json({
+      ok: false,
+      error: "Mappa del vento temporaneamente non disponibile.",
+      details: process.env.NODE_ENV === "development" ? error.message : undefined,
+    });
   }
 });
 
@@ -241,6 +259,7 @@ app.get("/api/cloud-forecast", async (_request, response) => {
       ok: true,
       generatedAt: new Date().toISOString(),
       source: "Open-Meteo",
+      sourceMode: weatherService.mode,
       methodology: "Copertura nuvolosa oraria modellata; non e un'immagine satellitare osservata.",
       bounds: SARDINIA_BBOX,
       frames,
@@ -252,6 +271,7 @@ app.get("/api/cloud-forecast", async (_request, response) => {
     return response.status(502).json({
       ok: false,
       error: "Previsione della nuvolosita temporaneamente non disponibile.",
+      details: process.env.NODE_ENV === "development" ? error.message : undefined,
     });
   }
 });
@@ -281,7 +301,12 @@ app.get("/api/wind-history", async (request, response) => {
 
   try {
     const wind = await fetchWindHistory({ latitude, longitude, startAt });
-    const payload = { ok: true, generatedAt: new Date().toISOString(), ...wind };
+    const payload = {
+      ok: true,
+      generatedAt: new Date().toISOString(),
+      sourceMode: weatherService.mode,
+      ...wind,
+    };
     cache.set(cacheKey, payload, 20 * 60_000);
     return response.json({ ...payload, cached: false });
   } catch (error) {
@@ -313,4 +338,5 @@ app.get("/{*splat}", (_request, response) => {
 app.listen(port, "0.0.0.0", () => {
   console.log(`Sardegna FireWatch disponibile su http://localhost:${port}`);
   console.log(`Modalita feed: ${firmsMapKey ? "EFFIS + NASA FIRMS" : "EFFIS (FIRMS_MAP_KEY non configurata)"}`);
+  console.log(`Modalita meteo: ${weatherService.mode}${weatherConfigured ? "" : " (configurazione commerciale mancante)"}`);
 });
