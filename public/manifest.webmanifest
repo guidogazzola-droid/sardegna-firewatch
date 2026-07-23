@@ -1,6 +1,6 @@
 {
-  "name": "Sardegna FireWatch",
-  "short_name": "FireWatch",
+  "name": "Sabetta Piro - Sardegna",
+  "short_name": "Sabetta Piro",
   "description": "Monitoraggio satellitare quasi in tempo reale degli incendi in Sardegna.",
   "start_url": "/",
   "display": "standalone",
