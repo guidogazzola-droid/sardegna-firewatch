@@ -39,15 +39,6 @@ jobs:
         working-directory: mobile
         run: npm ci --include=dev --no-audit --no-fund
 
-      - name: Verify mobile project
-        working-directory: mobile
-        run: |
-          npm run typecheck
-          npx expo install --check
-          npm run doctor
-          npx expo config --type public
-          npx expo export --platform ios --output-dir dist-weather-ci
-
       - name: Commit refreshed lockfile
         shell: bash
         run: |
@@ -61,3 +52,23 @@ jobs:
           git add mobile/package-lock.json
           git commit -m "Refresh mobile lockfile for weather layers"
           git push origin HEAD:feature/ios-weather-layers
+
+      - name: Type-check
+        working-directory: mobile
+        run: npm run typecheck
+
+      - name: Check Expo dependency versions
+        working-directory: mobile
+        run: npx expo install --check
+
+      - name: Run Expo Doctor
+        working-directory: mobile
+        run: npm run doctor
+
+      - name: Resolve Expo config
+        working-directory: mobile
+        run: npx expo config --type public
+
+      - name: Bundle iOS JavaScript
+        working-directory: mobile
+        run: npx expo export --platform ios --output-dir dist-weather-ci
