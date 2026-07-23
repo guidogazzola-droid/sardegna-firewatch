@@ -1,7 +1,7 @@
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFireData } from "../../src/context/fire-data";
-import { API_BASE_URL, APP_DISPLAY_NAME } from "../../src/lib/config";
+import { API_BASE_URL, APP_DISPLAY_NAME, APP_VERSION } from "../../src/lib/config";
 import { spacing, useAppTheme } from "../../src/theme";
 
 export default function SettingsScreen() {
@@ -64,12 +64,13 @@ export default function SettingsScreen() {
           <ExternalLink label="NASA FIRMS" url="https://firms.modaps.eosdis.nasa.gov/" />
           <ExternalLink label="Copernicus EFFIS" url="https://forest-fire.emergency.copernicus.eu/" />
           <ExternalLink label="Open-Meteo" url="https://open-meteo.com/" />
+          <ExternalLink label="ArcGIS Basemaps" url="https://developers.arcgis.com/rest/basemap-styles/" />
           <ExternalLink label="Bollettino Regione Sardegna" url="https://www.sardegnaambiente.it/index.php?c=7093&s=20&v=9&xsl=2273" />
         </Section>
 
         <Section title="Versione tecnica">
           <MetaRow label="Nome pubblico" value={APP_DISPLAY_NAME} />
-          <MetaRow label="App" value="0.1.0" />
+          <MetaRow label="App" value={APP_VERSION} />
           <MetaRow label="Bundle ID" value="com.guidogazzola.sardiniafirewatch" />
           <MetaRow label="Backend" value={API_BASE_URL} />
           <Text style={[styles.meta, { color: theme.textMuted }]}>Le preferenze della zona monitorata restano sul dispositivo; in questa fase non e richiesto alcun account.</Text>
@@ -82,7 +83,7 @@ export default function SettingsScreen() {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   const theme = useAppTheme();
   return (
-    <View style={[styles.section, { backgroundColor: theme.surface, borderColor: theme.border }]}> 
+    <View style={[styles.section, { backgroundColor: theme.surface, borderColor: theme.border }]}>
       <Text style={[styles.sectionTitle, { color: theme.text }]}>{title}</Text>
       {children}
     </View>
