@@ -2,6 +2,16 @@ function withoutTrailingSlash(value: string): string {
   return value.replace(/\/+$/, "");
 }
 
+function configuredText(value: string | undefined, fallback: string): string {
+  const text = String(value ?? "").trim();
+  return text || fallback;
+}
+
+export const APP_DISPLAY_NAME = configuredText(
+  process.env.EXPO_PUBLIC_APP_DISPLAY_NAME,
+  "Sardinia FireWatch",
+);
+
 export const API_BASE_URL = withoutTrailingSlash(
   process.env.EXPO_PUBLIC_API_BASE_URL ?? "https://sardegna-firewatch.onrender.com",
 );
