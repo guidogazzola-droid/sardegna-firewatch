@@ -44,22 +44,30 @@ jobs:
         run: |
           if [ -z "$(git status --porcelain -- mobile/package-lock.json)" ]; then
             echo "The mobile lockfile is already current."
-            exit 0
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add mobile/package-lock.json
+            git commit -m "Refresh mobile lockfile for weather layers"
+            git push origin HEAD:feature/ios-weather-layers
           fi
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add mobile/package-lock.json
-          git commit -m "Refresh mobile lockfile for weather layers"
-          git push origin HEAD:feature/ios-weather-layers
 
       - name: Type-check
         working-directory: mobile
         run: npm run typecheck
 
-      - name: Check Expo dependency versions
+      - name: Capture Expo dependency check
+        id: expo_check
         working-directory: mobile
-        run: npx expo install --check
+        shell: bash
+        run: |
+          set +e
+          npx expo install --check > expo-install-check.log 2>&1
+          status=$?
+          set -e
+          cat expo-install-check.log
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          exit 0
 
       - name: Run Expo Doctor
         working-directory: mobile
@@ -72,3 +80,19 @@ jobs:
       - name: Bundle iOS JavaScript
         working-directory: mobile
         run: npx expo export --platform ios --output-dir dist-weather-ci
+
+      - name: Upload Expo diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: weather-expo-check-${{ github.run_id }}
+          path: mobile/expo-install-check.log
+          if-no-files-found: error
+          retention-days: 3
+
+      - name: Report Expo dependency result
+        if: steps.expo_check.outputs.status != '0'
+        working-directory: mobile
+        run: |
+          cat expo-install-check.log
+          exit 1
