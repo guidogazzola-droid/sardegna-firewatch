@@ -7,6 +7,7 @@ import { spacing, useAppTheme } from "../../src/theme";
 export default function SettingsScreen() {
   const theme = useAppTheme();
   const { status } = useFireData();
+  const weatherCommercial = status?.weatherService?.commercialReady === true;
 
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: theme.background }]} edges={["top"]}>
@@ -22,6 +23,32 @@ export default function SettingsScreen() {
           <InfoRow label="Vento Open-Meteo" enabled={status?.sources.windMap ?? false} />
           <InfoRow label="Nuvolosita Open-Meteo" enabled={status?.sources.cloudForecast ?? false} />
           <Text style={[styles.meta, { color: theme.textMuted }]}>Aggiornamento previsto ogni {status?.refreshSeconds ?? 300} secondi.</Text>
+        </Section>
+
+        <Section title="Conformita delle fonti">
+          <MetaRow label="Servizio meteo" value={status?.weatherService?.provider ?? "Open-Meteo"} />
+          <MetaRow
+            label="Modalita meteo"
+            value={weatherCommercial ? "Licenza commerciale attiva" : "Valutazione / test interno"}
+          />
+          <View
+            style={[
+              styles.complianceNotice,
+              {
+                backgroundColor: weatherCommercial ? `${theme.success}12` : `${theme.warning}14`,
+                borderColor: weatherCommercial ? `${theme.success}45` : `${theme.warning}50`,
+              },
+            ]}
+          >
+            <Text style={[styles.complianceTitle, { color: weatherCommercial ? theme.success : theme.warning }]}>
+              {weatherCommercial ? "Configurazione commerciale verificata" : "Rilascio a pagamento non ancora abilitato"}
+            </Text>
+            <Text style={[styles.meta, { color: theme.textMuted }]}>
+              {weatherCommercial
+                ? "Il backend dichiara l'endpoint commerciale configurato. La verifica dei termini resta parte della checklist di rilascio."
+                : "Questa build usa i dati meteo in modalita di valutazione. Prima della vendita pubblica servono endpoint e chiave commerciali conformi."}
+            </Text>
+          </View>
         </Section>
 
         <Section title="Uso corretto dei dati">
@@ -113,6 +140,8 @@ const styles = StyleSheet.create({
   body: { fontSize: 13, lineHeight: 19 },
   emergency: { borderRadius: 15, borderWidth: StyleSheet.hairlineWidth, padding: spacing.md, gap: 4 },
   emergencyTitle: { fontSize: 14, fontWeight: "800" },
+  complianceNotice: { borderRadius: 15, borderWidth: StyleSheet.hairlineWidth, padding: spacing.md, gap: 4 },
+  complianceTitle: { fontSize: 13, fontWeight: "800" },
   linkRow: { minHeight: 38, flexDirection: "row", alignItems: "center" },
   linkLabel: { flex: 1, fontSize: 14, fontWeight: "700" },
   linkArrow: { fontSize: 17, fontWeight: "700" },
