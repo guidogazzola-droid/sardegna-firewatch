@@ -13,7 +13,8 @@ A production App Store build must not be released unless all entries marked **BL
 | NASA LANCE FIRMS | Active-fire and thermal-anomaly observations | ALLOWED WITH CONDITIONS | Use a valid FIRMS MAP_KEY, acknowledge NASA/FIRMS, preserve provenance, do not imply NASA endorsement, and respect transaction limits. |
 | Copernicus EMS / EFFIS | Hotspots, recent burned areas, fire-weather layers | ALLOWED WITH CONDITIONS | Attribute Copernicus/EFFIS and the European Union; keep the information-only disclaimer; verify the terms of each requested layer, including any third-party component. |
 | Open-Meteo weather API and data | Wind, cloud cover, weather history used in smoke-drift estimates | **BLOCKED FOR PAID RELEASE UNTIL CONFIGURED** | The public free API is restricted to non-commercial use. Before a paid App Store release, configure a commercial Open-Meteo endpoint/API key or a compliant self-hosted instance. Keep Open-Meteo and underlying-provider attribution and identify derived estimates as modified/derived data. |
-| ArcGIS Basemap Styles service | Satellite, topographic, and street basemaps | **BLOCKED UNTIL CONFIGURED** | Use an ArcGIS Location Platform or ArcGIS Online account, a restricted access token, and an applicable billing plan. Display Esri attribution and all data-provider attribution returned by the style. Do not call undocumented public tile endpoints directly. |
+| ArcGIS Basemap Styles service | Primary satellite, topographic, and street basemaps | **BLOCKED UNTIL CONFIGURED AND VERIFIED** | Use an ArcGIS Location Platform or ArcGIS Online account, a restricted access token, and an applicable billing plan. Display Esri attribution and all data-provider attribution returned by the style. Do not call undocumented public tile endpoints directly. |
+| OpenFreeMap / OpenMapTiles / OpenStreetMap | Automatic emergency basemap if ArcGIS cannot be loaded | ALLOWED WITH CONDITIONS | Keep visible attribution, do not remove provider notices, monitor the public service terms and availability, and retain the option to self-host if reliability requirements increase. |
 | MapLibre React Native | Native map rendering library | ALLOWED WITH CONDITIONS | Preserve the library licence notices in the distributed software documentation. MapLibre does not grant rights to third-party map data. |
 
 ## 1. NASA LANCE FIRMS
@@ -89,13 +90,29 @@ The smoke track in Sardinia FireWatch is a project-generated estimate derived fr
 
 - Authenticate through the documented Basemap Styles service.
 - Restrict the token to the intended application and services where supported.
+- The credential must include the `premium:user:basemaps` privilege.
+- Regenerate the API key after changing credential privileges; editing privileges invalidates previously generated keys.
 - Monitor usage and billing.
 - Display `Powered by Esri` plus all provider attribution contained in the returned style/metadata.
 - Keep attribution visible near the map or available through the map attribution control in accordance with Esri guidance.
 
 The application must not use raw `server.arcgisonline.com` tile URLs as an undocumented substitute for an authenticated commercial basemap service.
 
-## 5. Derived analytics owned by the project
+## 5. OpenFreeMap emergency fallback
+
+**Official sources**
+
+- Project and commercial-use statement: https://openfreemap.org/
+- Mobile integration guide: https://openfreemap.org/quick_start/
+- Terms of service: https://openfreemap.org/tos/
+
+OpenFreeMap is used only when the primary ArcGIS basemap cannot be authorized, downloaded, or rendered. Its public instance is best-effort and has no SLA. The application must always display:
+
+> OpenFreeMap · OpenMapTiles · © OpenStreetMap contributors
+
+The fallback must not be presented as satellite imagery. If service reliability becomes material to the paid product, the project should self-host OpenFreeMap/OpenMapTiles or use a contracted provider.
+
+## 6. Derived analytics owned by the project
 
 Sardinia FireWatch may own original code, interface design, and independently created calculations, but it does not acquire ownership of upstream observations or map content.
 
@@ -116,8 +133,9 @@ Before every App Store submission:
 - [ ] Re-open every official terms link above and record the review date.
 - [ ] Confirm the Open-Meteo commercial endpoint or compliant self-host is active.
 - [ ] Confirm the ArcGIS account, restricted token, attribution rendering, and billing settings.
+- [ ] Confirm the generated ArcGIS key is current after every privilege edit.
 - [ ] Confirm FIRMS MAP_KEY ownership and transaction limits.
 - [ ] Confirm enabled EFFIS layers and their product-specific metadata/terms.
 - [ ] Verify all source and derived-data notices in the app.
 - [ ] Verify the privacy policy covers server requests, location use, diagnostics, and notification identifiers.
-- [ ] Confirm marketing text does not imply endorsement by NASA, the EU, Esri, Open-Meteo, or public authorities.
+- [ ] Confirm marketing text does not imply endorsement by NASA, the EU, Esri, Open-Meteo, OpenFreeMap, or public authorities.
