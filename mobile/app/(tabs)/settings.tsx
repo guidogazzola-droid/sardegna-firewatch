@@ -1,12 +1,13 @@
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFireData } from "../../src/context/fire-data";
-import { API_BASE_URL } from "../../src/lib/config";
+import { API_BASE_URL, APP_DISPLAY_NAME } from "../../src/lib/config";
 import { spacing, useAppTheme } from "../../src/theme";
 
 export default function SettingsScreen() {
   const theme = useAppTheme();
   const { status } = useFireData();
+  const weatherCommercial = status?.weatherService?.commercialReady === true;
 
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: theme.background }]} edges={["top"]}>
@@ -24,8 +25,34 @@ export default function SettingsScreen() {
           <Text style={[styles.meta, { color: theme.textMuted }]}>Aggiornamento previsto ogni {status?.refreshSeconds ?? 300} secondi.</Text>
         </Section>
 
+        <Section title="Conformita delle fonti">
+          <MetaRow label="Servizio meteo" value={status?.weatherService?.provider ?? "Open-Meteo"} />
+          <MetaRow
+            label="Modalita meteo"
+            value={weatherCommercial ? "Licenza commerciale attiva" : "Valutazione / test interno"}
+          />
+          <View
+            style={[
+              styles.complianceNotice,
+              {
+                backgroundColor: weatherCommercial ? `${theme.success}12` : `${theme.warning}14`,
+                borderColor: weatherCommercial ? `${theme.success}45` : `${theme.warning}50`,
+              },
+            ]}
+          >
+            <Text style={[styles.complianceTitle, { color: weatherCommercial ? theme.success : theme.warning }]}>
+              {weatherCommercial ? "Configurazione commerciale verificata" : "Rilascio a pagamento non ancora abilitato"}
+            </Text>
+            <Text style={[styles.meta, { color: theme.textMuted }]}>
+              {weatherCommercial
+                ? "Il backend dichiara l'endpoint commerciale configurato. La verifica dei termini resta parte della checklist di rilascio."
+                : "Questa build usa i dati meteo in modalita di valutazione. Prima della vendita pubblica servono endpoint e chiave commerciali conformi."}
+            </Text>
+          </View>
+        </Section>
+
         <Section title="Uso corretto dei dati">
-          <Text style={[styles.body, { color: theme.text }]}>Sardinia FireWatch e uno strumento informativo, non un sistema ufficiale di emergenza.</Text>
+          <Text style={[styles.body, { color: theme.text }]}>{APP_DISPLAY_NAME} e uno strumento informativo, non un sistema ufficiale di emergenza.</Text>
           <Text style={[styles.body, { color: theme.textMuted }]}>Una rilevazione termica satellitare puo essere incompleta, ritardata o dovuta a una sorgente di calore diversa da un incendio. Vento, nuvole e traiettorie sono dati modellati o stime e non sostituiscono le comunicazioni delle autorita competenti.</Text>
           <View style={[styles.emergency, { backgroundColor: `${theme.danger}15`, borderColor: `${theme.danger}50` }]}>
             <Text style={[styles.emergencyTitle, { color: theme.danger }]}>In presenza di fumo o fiamme</Text>
@@ -41,6 +68,7 @@ export default function SettingsScreen() {
         </Section>
 
         <Section title="Versione tecnica">
+          <MetaRow label="Nome pubblico" value={APP_DISPLAY_NAME} />
           <MetaRow label="App" value="0.1.0" />
           <MetaRow label="Bundle ID" value="com.guidogazzola.sardiniafirewatch" />
           <MetaRow label="Backend" value={API_BASE_URL} />
@@ -54,7 +82,7 @@ export default function SettingsScreen() {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   const theme = useAppTheme();
   return (
-    <View style={[styles.section, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+    <View style={[styles.section, { backgroundColor: theme.surface, borderColor: theme.border }]}> 
       <Text style={[styles.sectionTitle, { color: theme.text }]}>{title}</Text>
       {children}
     </View>
@@ -113,6 +141,8 @@ const styles = StyleSheet.create({
   body: { fontSize: 13, lineHeight: 19 },
   emergency: { borderRadius: 15, borderWidth: StyleSheet.hairlineWidth, padding: spacing.md, gap: 4 },
   emergencyTitle: { fontSize: 14, fontWeight: "800" },
+  complianceNotice: { borderRadius: 15, borderWidth: StyleSheet.hairlineWidth, padding: spacing.md, gap: 4 },
+  complianceTitle: { fontSize: 13, fontWeight: "800" },
   linkRow: { minHeight: 38, flexDirection: "row", alignItems: "center" },
   linkLabel: { flex: 1, fontSize: 14, fontWeight: "700" },
   linkArrow: { fontSize: 17, fontWeight: "700" },

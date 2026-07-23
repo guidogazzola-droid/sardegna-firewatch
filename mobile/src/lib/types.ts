@@ -1,6 +1,13 @@
 export type ConfidenceLevel = "high" | "nominal" | "low" | "unknown";
 export type SeverityLevel = "critical" | "high" | "medium" | "low";
 
+export interface GeoBounds {
+  west: number;
+  south: number;
+  east: number;
+  north: number;
+}
+
 export interface FireDetection {
   id: string;
   latitude: number;
@@ -51,17 +58,111 @@ export interface FireFeedResponse {
   cached?: boolean;
 }
 
+export interface WindSample {
+  latitude: number;
+  longitude: number;
+  speed: number;
+  gust: number | null;
+  directionFrom: number;
+  directionTo: number;
+  observedAt: string | null;
+}
+
+export interface WindGridResponse {
+  ok: boolean;
+  generatedAt: string;
+  source: string;
+  sourceMode?: "evaluation" | "commercial";
+  units: {
+    speed: string;
+    direction: string;
+  };
+  bounds: GeoBounds;
+  samples: WindSample[];
+  cached?: boolean;
+}
+
+export interface CloudSample {
+  latitude: number;
+  longitude: number;
+  cover: number;
+  low: number | null;
+  mid: number | null;
+  high: number | null;
+}
+
+export interface CloudFrame {
+  time: string;
+  averageCover: number;
+  samples: CloudSample[];
+}
+
+export interface CloudForecastResponse {
+  ok: boolean;
+  generatedAt: string;
+  source: string;
+  sourceMode?: "evaluation" | "commercial";
+  methodology: string;
+  bounds: GeoBounds;
+  frames: CloudFrame[];
+  cached?: boolean;
+}
+
+export interface WindHistorySample {
+  time: string;
+  speed: number;
+  direction: number;
+  gust: number | null;
+}
+
+export interface WindHistorySummary {
+  averageSpeed: number;
+  maxSpeed: number;
+  maxGust: number;
+  windFromDegrees: number;
+  windFromLabel: string;
+  smokeToDegrees: number;
+  smokeToLabel: string;
+  sampleCount: number;
+}
+
+export interface WindHistoryResponse {
+  ok: boolean;
+  generatedAt: string;
+  sourceMode?: "evaluation" | "commercial";
+  requestedStartAt: string;
+  startAt: string;
+  endAt: string;
+  truncated: boolean;
+  units: {
+    speed: string;
+    direction: string;
+  };
+  summary: WindHistorySummary;
+  samples: WindHistorySample[];
+  smokeTrack: [latitude: number, longitude: number][];
+  methodology: {
+    source: string;
+    smokeDirection: string;
+    track: string;
+  };
+  cached?: boolean;
+}
+
+export interface WeatherServiceStatus {
+  provider: string;
+  mode: "evaluation" | "commercial";
+  commercialReady: boolean;
+  commercialRequired: boolean;
+}
+
 export interface SystemStatusResponse {
   ok: boolean;
   mode: string;
   firmsConfigured: boolean;
   refreshSeconds: number;
-  bbox: {
-    west: number;
-    south: number;
-    east: number;
-    north: number;
-  };
+  bbox: GeoBounds;
+  weatherService?: WeatherServiceStatus;
   sources: {
     effis: boolean;
     firms: boolean;

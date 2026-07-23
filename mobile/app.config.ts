@@ -6,16 +6,25 @@ interface EasProjectMetadata {
   projectId: string | null;
 }
 
+function configuredText(value: string | undefined, fallback: string): string {
+  const text = String(value ?? "").trim();
+  return text || fallback;
+}
+
 const easProject = JSON.parse(
   readFileSync(resolve(process.cwd(), "eas-project.json"), "utf8"),
 ) as EasProjectMetadata;
 const EAS_PROJECT_ID = easProject.projectId;
+const APP_DISPLAY_NAME = configuredText(
+  process.env.EXPO_PUBLIC_APP_DISPLAY_NAME,
+  "Sardinia FireWatch",
+);
 const API_BASE_URL =
   process.env.EXPO_PUBLIC_API_BASE_URL ?? "https://sardegna-firewatch.onrender.com";
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
-  name: "Sardinia FireWatch",
+  name: APP_DISPLAY_NAME,
   slug: "sardinia-firewatch",
   owner: "camerun",
   scheme: "sardiniafirewatch",
@@ -40,7 +49,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       "expo-location",
       {
         locationWhenInUsePermission:
-          "Sardinia FireWatch usa la tua posizione solo mentre usi l'app, per mostrarti le rilevazioni vicine e creare zone monitorate.",
+          `${APP_DISPLAY_NAME} usa la tua posizione solo mentre usi l'app, per mostrarti le rilevazioni vicine e creare zone monitorate.`,
         isIosBackgroundLocationEnabled: false,
         isAndroidBackgroundLocationEnabled: false,
       },
