@@ -1,0 +1,47 @@
+name: Connect EAS to App Store Connect app
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/eas-asc-connect.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  connect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: mobile
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.16.0"
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - run: npm ci --no-audit --no-fund
+
+      - name: Connect the exact bundle identifier
+        shell: bash
+        run: |
+          printf '\n\n\n' | script -qefc "eas integrations:asc:connect --bundle-id com.guidogazzola.sardiniafirewatch" /dev/null
+
+      - name: Verify App Store Connect link
+        run: eas integrations:asc:status --json
