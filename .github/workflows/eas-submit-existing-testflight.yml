@@ -44,16 +44,35 @@ jobs:
 
       - run: npm ci --no-audit --no-fund
 
-      - name: Wait for EAS build 8
+      - name: Resolve and wait for EAS build 8
         shell: bash
         run: |
           for attempt in $(seq 1 60); do
-            eas build:view "$EAS_BUILD_ID" --json > eas-build.json
-            status="$(node -e "const f=require('fs'); const b=JSON.parse(f.readFileSync('eas-build.json','utf8')); process.stdout.write(String(b.status || 'UNKNOWN'))")"
-            echo "EAS build status: $status (attempt $attempt/60)"
+            eas build:list --platform ios --limit 10 --json --non-interactive > eas-builds.json
+            summary="$(node - <<'NODE'
+          const fs = require("fs");
+          const builds = JSON.parse(fs.readFileSync("eas-builds.json", "utf8"));
+          for (const build of builds) {
+            console.error(
+              `EAS build ${build.id}: buildNumber=${build.appBuildVersion ?? "?"} status=${build.status}`,
+            );
+          }
+          const target =
+            builds.find((build) => build.id === process.env.EAS_BUILD_ID) ??
+            builds.find((build) => String(build.appBuildVersion) === "8");
+          if (!target) {
+            console.error("Build number 8 was not found.");
+            process.exit(4);
+          }
+          process.stdout.write(`${target.id}\t${target.status}`);
+          NODE
+          )"
+            IFS=$'\t' read -r resolved_id status <<< "$summary"
+            echo "Resolved EAS build: $resolved_id; status: $status (attempt $attempt/60)"
             case "$status" in
               FINISHED)
-                rm -f eas-build.json
+                echo "RESOLVED_EAS_BUILD_ID=$resolved_id" >> "$GITHUB_ENV"
+                rm -f eas-builds.json
                 exit 0
                 ;;
               ERRORED|CANCELED)
@@ -67,4 +86,4 @@ jobs:
           exit 1
 
       - name: Submit build 8 to TestFlight
-        run: eas submit --platform ios --id "$EAS_BUILD_ID" --profile production --non-interactive --wait
+        run: eas submit --platform ios --id "$RESOLVED_EAS_BUILD_ID" --profile production --non-interactive --wait
