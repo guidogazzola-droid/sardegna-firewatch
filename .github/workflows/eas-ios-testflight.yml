@@ -63,5 +63,8 @@ jobs:
           eas project:info
           npx expo config --type public
 
+      - name: Verify App Store Connect link
+        run: eas integrations:asc:status --json
+
       - name: Build iOS and submit to TestFlight
         run: eas build --platform ios --profile production --non-interactive --auto-submit --wait
