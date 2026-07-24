@@ -41,7 +41,7 @@ jobs:
       - name: Connect the exact bundle identifier
         shell: bash
         run: |
-          printf '\n\n\n' | script -qefc "eas integrations:asc:connect --bundle-id com.guidogazzola.sardiniafirewatch" /dev/null
+          printf '\n\n\n' | script -qefc "env -u CI eas integrations:asc:connect --bundle-id com.guidogazzola.sardiniafirewatch" /dev/null
 
       - name: Verify App Store Connect link
         run: eas integrations:asc:status --json
