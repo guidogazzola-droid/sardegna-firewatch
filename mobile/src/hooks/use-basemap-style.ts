@@ -4,6 +4,11 @@ import { FALLBACK_MAP_STYLE_URL } from "../lib/map-styles";
 
 type MapStyleValue = string | StyleSpecification;
 
+type SourceWithTiles = {
+  type?: string;
+  tiles?: string[];
+};
+
 interface ArcGisErrorPayload {
   error?: {
     code?: number;
@@ -21,11 +26,18 @@ export interface BasemapStyleState {
   handleNativeFailure: () => void;
 }
 
+const arcgisAccessToken = String(
+  process.env.EXPO_PUBLIC_ARCGIS_ACCESS_TOKEN ?? "",
+).trim();
+
+const ARCGIS_RESOURCE_URL =
+  /^https:\/\/[^/]*(?:arcgis\.com|arcgisonline\.com)(?:\/|$)/i;
+
 function safeArcGisError(payload: unknown, status: number): string {
   const candidate = payload as ArcGisErrorPayload;
   const code = candidate?.error?.code ?? status;
   if (code === 498 || code === 499 || status === 401 || status === 403) {
-    return "ArcGIS non ha autorizzato la mappa. Verifica che la chiave sia quella generata, che disponga del privilegio Basemap styles service e che sia stata rigenerata dopo eventuali modifiche ai privilegi.";
+    return "ArcGIS non ha autorizzato la mappa. Verifica che la chiave disponga del privilegio Basemap styles service e che sia stata rigenerata dopo eventuali modifiche.";
   }
   if (candidate?.error?.message) {
     return `ArcGIS non ha caricato la mappa (codice ${code}).`;
@@ -37,6 +49,57 @@ function isStyleSpecification(payload: unknown): payload is StyleSpecification {
   if (!payload || typeof payload !== "object") return false;
   const style = payload as Partial<StyleSpecification>;
   return style.version === 8 && Array.isArray(style.layers) && Boolean(style.sources);
+}
+
+function appendQueryParameter(url: string, name: string, value: string): string {
+  if (new RegExp(`(?:[?&])${name}=`).test(url)) return url;
+  return `${url}${url.includes("?") ? "&" : "?"}${name}=${encodeURIComponent(value)}`;
+}
+
+function authenticateArcGisResource(url: string, includeJsonFormat = false): string {
+  if (!arcgisAccessToken || !ARCGIS_RESOURCE_URL.test(url)) return url;
+  let authenticatedUrl = url;
+  if (includeJsonFormat) {
+    authenticatedUrl = appendQueryParameter(authenticatedUrl, "f", "json");
+  }
+  return appendQueryParameter(authenticatedUrl, "token", arcgisAccessToken);
+}
+
+/**
+ * The Basemap Styles response contains URLs for tiles, glyphs and sprites.
+ * MapLibre Native requests those resources independently after JavaScript has
+ * downloaded the style. Esri's official MapLibre integration authenticates
+ * each of those URLs explicitly, so we apply the same transformation here.
+ */
+function authenticateArcGisStyle(payload: StyleSpecification): StyleSpecification {
+  const style = JSON.parse(JSON.stringify(payload)) as StyleSpecification;
+
+  if (style.glyphs) {
+    style.glyphs = authenticateArcGisResource(style.glyphs, true);
+  }
+
+  Object.values(style.sources).forEach((source) => {
+    const tiledSource = source as SourceWithTiles;
+    if (!Array.isArray(tiledSource.tiles)) return;
+    tiledSource.tiles = tiledSource.tiles.map((url) =>
+      authenticateArcGisResource(url, true),
+    );
+  });
+
+  const sprite = style.sprite as unknown;
+  if (typeof sprite === "string") {
+    style.sprite = authenticateArcGisResource(sprite) as StyleSpecification["sprite"];
+  } else if (Array.isArray(sprite)) {
+    style.sprite = sprite.map((entry) => {
+      if (!entry || typeof entry !== "object") return entry;
+      const item = entry as { id?: string; url?: string };
+      return typeof item.url === "string"
+        ? { ...item, url: authenticateArcGisResource(item.url) }
+        : item;
+    }) as StyleSpecification["sprite"];
+  }
+
+  return style;
 }
 
 export function useBasemapStyle(
@@ -60,7 +123,7 @@ export function useBasemapStyle(
     setUsingFallback(true);
     setLoading(false);
     setError(
-      "Lo stile ArcGIS è stato ricevuto, ma il motore cartografico non è riuscito a visualizzarlo. È stata attivata automaticamente la mappa OpenFreeMap.",
+      "Il motore cartografico non è riuscito a visualizzare la basemap ArcGIS. È stata attivata automaticamente la mappa OpenFreeMap.",
     );
   }, [usingFallback]);
 
@@ -95,7 +158,7 @@ export function useBasemapStyle(
           throw new Error("ArcGIS ha restituito uno stile cartografico non valido.");
         }
         if (requestSequence.current !== sequence) return;
-        setMapStyle(payload);
+        setMapStyle(authenticateArcGisStyle(payload));
         setUsingFallback(false);
         setError(null);
       } catch (loadError) {

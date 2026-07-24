@@ -4,10 +4,7 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { FireDataProvider } from "../src/context/fire-data";
-import { configureArcGisMapRequests } from "../src/lib/map-network";
 import { useAppTheme } from "../src/theme";
-
-configureArcGisMapRequests();
 
 export default function RootLayout() {
   const theme = useAppTheme();
