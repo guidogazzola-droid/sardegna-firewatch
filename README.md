@@ -22,7 +22,8 @@ Il progetto usa due livelli di servizio:
 - simulazione animata della copertura nuvolosa modellata per le successive 24 ore;
 - direzione prevalente sottovento e traiettoria indicativa del fumo visualizzata sulla mappa;
 - area personale con raggio da 5 a 100 km;
-- notifiche browser per nuovi hotspot vicini, mentre la pagina e aperta;
+- notifiche browser per nuovi hotspot vicini, mentre la pagina web e aperta;
+- registro anonimo delle zone iOS e notifiche push native anche ad app chiusa;
 - aggiornamento automatico, cache server e tolleranza al guasto di una singola sorgente;
 - PWA installabile, interfaccia mobile e modalita a contrasto elevato;
 - numeri di emergenza 1515 e 112 sempre visibili.
@@ -59,6 +60,9 @@ La chiave resta sul server: non viene mai inviata al browser.
 | `PORT` | `3000` | Porta HTTP del server |
 | `FIRMS_MAP_KEY` | vuota | Chiave NASA FIRMS; facoltativa |
 | `CACHE_TTL_MS` | `300000` | Durata della cache del feed FIRMS |
+| `ALERT_STORE_PATH` | `.data/alerts.json` | Registro notifiche; in produzione deve trovarsi su storage persistente |
+| `ALERT_MONITOR_INTERVAL_MS` | `300000` | Frequenza del controllo push, minimo 60 secondi |
+| `EXPO_ACCESS_TOKEN` | vuota | Token facoltativo se Expo Push Security e attiva |
 | `NODE_ENV` | `development` | Usare `production` in distribuzione |
 
 ## Docker
@@ -91,6 +95,10 @@ Aggiungere `FIRMS_MAP_KEY` come variabile segreta nell'ambiente di hosting. Per 
 - `GET /api/wind-history?lat=40.0&lon=9.0&start=2026-07-18T10:00:00Z` — storico del vento e direzione indicativa del fumo.
 - `GET /api/wind-grid?south=38.7&west=7.7&north=41.4&east=10.2&rows=4&columns=5` — griglia del vento attuale per l'area visibile.
 - `GET /api/cloud-forecast` — sequenza oraria della copertura nuvolosa modellata sulla Sardegna.
+- `POST /api/alerts/subscriptions` — registra anonimamente token push e zona monitorata.
+- `PATCH /api/alerts/subscriptions/:id` — aggiorna la zona usando la chiave conservata sul dispositivo.
+- `DELETE /api/alerts/subscriptions/:id` — cancella definitivamente la registrazione.
+- `POST /api/alerts/subscriptions/:id/test` — invia una notifica di prova.
 
 Valori ammessi per `sources`: `viirs`, `modis`, `all`. L'intervallo `days` e limitato a 1-5 giorni.
 
@@ -100,7 +108,7 @@ Valori ammessi per `sources`: `viirs`, `modis`, `all`. L'intervallo `days` e lim
 npm test
 ```
 
-I test coprono parsing CSV, normalizzazione della confidenza, orari UTC, classificazione della priorita, limiti geografici, stima dell'inizio evento e calcoli vettoriali del vento.
+I test coprono parsing CSV, normalizzazione della confidenza, orari UTC, classificazione della priorita, limiti geografici, stima dell'inizio evento, calcoli vettoriali del vento, autenticazione del registro notifiche, filtri di prossimita e deduplicazione.
 
 ## Struttura
 

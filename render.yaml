@@ -11,5 +11,7 @@ services:
         value: production
       - key: CACHE_TTL_MS
         value: "300000"
+      - key: ALERT_MONITOR_INTERVAL_MS
+        value: "300000"
       - key: FIRMS_MAP_KEY
         sync: false
