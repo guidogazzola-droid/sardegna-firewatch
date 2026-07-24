@@ -25,6 +25,7 @@ jobs:
         working-directory: mobile
     env:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      EXPO_NO_TELEMETRY: "1"
 
     steps:
       - name: Check out main
