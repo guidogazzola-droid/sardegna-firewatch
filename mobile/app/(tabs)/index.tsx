@@ -1,11 +1,3 @@
-import {
-  Camera,
-  GeoJSONSource,
-  Layer,
-  Map,
-  Marker,
-  type MapRef,
-} from "@maplibre/maplibre-react-native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -14,16 +6,20 @@ import {
   Text,
   View,
 } from "react-native";
+import MapView, {
+  Circle,
+  Marker,
+  Polyline,
+  type Region,
+} from "react-native-maps";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFireData } from "../../src/context/fire-data";
-import { useBasemapStyle } from "../../src/hooks/use-basemap-style";
 import { useWeatherLayers } from "../../src/hooks/use-weather-layers";
 import { fetchWindHistory } from "../../src/lib/api";
 import {
   APP_DISPLAY_NAME,
   SARDINIA_BOUNDS,
   SARDINIA_CENTER,
-  SARDINIA_INITIAL_ZOOM,
 } from "../../src/lib/config";
 import {
   confidenceLabel,
@@ -32,13 +28,7 @@ import {
   formatObservation,
   severityLabel,
 } from "../../src/lib/format";
-import {
-  ARCGIS_BASEMAPS_CONFIGURED,
-  BASE_MAPS,
-  DEFAULT_BASE_MAP_ID,
-  FALLBACK_MAP_ATTRIBUTION,
-  type BaseMapId,
-} from "../../src/lib/map-styles";
+import { BASE_MAPS, DEFAULT_BASE_MAP_ID, type BaseMapId } from "../../src/lib/map-styles";
 import type {
   FireDetection,
   GeoBounds,
@@ -48,8 +38,18 @@ import { severityColors, spacing, useAppTheme } from "../../src/theme";
 
 const BASE_MAP_ORDER: BaseMapId[] = ["satellite", "topographic", "street"];
 
-function clampBounds(bounds: [number, number, number, number]): GeoBounds | null {
-  const [west, south, east, north] = bounds;
+const INITIAL_REGION: Region = {
+  latitude: SARDINIA_CENTER[1],
+  longitude: SARDINIA_CENTER[0],
+  latitudeDelta: SARDINIA_BOUNDS.north - SARDINIA_BOUNDS.south,
+  longitudeDelta: SARDINIA_BOUNDS.east - SARDINIA_BOUNDS.west,
+};
+
+function clampRegion(region: Region): GeoBounds | null {
+  const west = region.longitude - region.longitudeDelta / 2;
+  const south = region.latitude - region.latitudeDelta / 2;
+  const east = region.longitude + region.longitudeDelta / 2;
+  const north = region.latitude + region.latitudeDelta / 2;
   const clipped = {
     west: Math.max(west, SARDINIA_BOUNDS.west),
     south: Math.max(south, SARDINIA_BOUNDS.south),
@@ -59,16 +59,17 @@ function clampBounds(bounds: [number, number, number, number]): GeoBounds | null
   return clipped.east > clipped.west && clipped.north > clipped.south ? clipped : null;
 }
 
-function emptyFeatureCollection(): GeoJSON.FeatureCollection {
-  return { type: "FeatureCollection", features: [] };
+function cloudOpacity(cover: number): string {
+  const alpha = Math.round(Math.min(0.5, Math.max(0.08, cover / 200)) * 255);
+  return `#eef5f8${alpha.toString(16).padStart(2, "0")}`;
 }
 
 export default function MapScreen() {
   const theme = useAppTheme();
-  const mapRef = useRef<MapRef | null>(null);
   const windRefreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const historyController = useRef<AbortController | null>(null);
   const [baseMapId, setBaseMapId] = useState<BaseMapId>(DEFAULT_BASE_MAP_ID);
+  const [isMapReady, setIsMapReady] = useState(false);
   const [windEnabled, setWindEnabled] = useState(true);
   const [cloudEnabled, setCloudEnabled] = useState(true);
   const [selectedFire, setSelectedFire] = useState<FireDetection | null>(null);
@@ -106,56 +107,24 @@ export default function MapScreen() {
 
   const visibleFires = fires.slice(0, 100);
   const baseMap = BASE_MAPS[baseMapId];
-  const {
-    mapStyle: resolvedMapStyle,
-    loading: isBasemapLoading,
-    usingFallback: isUsingFallbackMap,
-    error: basemapError,
-    handleNativeFailure,
-  } = useBasemapStyle(baseMap.style, ARCGIS_BASEMAPS_CONFIGURED);
-
-  const cloudGeoJson = useMemo<GeoJSON.FeatureCollection<GeoJSON.Point>>(
-    () => ({
-      type: "FeatureCollection",
-      features:
-        cloudEnabled && activeCloudFrame
-          ? activeCloudFrame.samples
-              .filter((sample) => Number.isFinite(sample.cover) && sample.cover >= 8)
-              .map((sample, index) => ({
-                type: "Feature" as const,
-                id: `cloud-${index}`,
-                properties: {
-                  cover: sample.cover,
-                  low: sample.low ?? 0,
-                  mid: sample.mid ?? 0,
-                  high: sample.high ?? 0,
-                },
-                geometry: {
-                  type: "Point" as const,
-                  coordinates: [sample.longitude, sample.latitude],
-                },
-              }))
-          : [],
-    }),
+  const visibleClouds = useMemo(
+    () =>
+      cloudEnabled && activeCloudFrame
+        ? activeCloudFrame.samples.filter(
+            (sample) => Number.isFinite(sample.cover) && sample.cover >= 8,
+          )
+        : [],
     [activeCloudFrame, cloudEnabled],
   );
 
-  const smokeGeoJson = useMemo<GeoJSON.FeatureCollection<GeoJSON.LineString>>(() => {
-    if (!history?.smokeTrack?.length) return emptyFeatureCollection() as GeoJSON.FeatureCollection<GeoJSON.LineString>;
-    return {
-      type: "FeatureCollection",
-      features: [
-        {
-          type: "Feature",
-          properties: {},
-          geometry: {
-            type: "LineString",
-            coordinates: history.smokeTrack.map(([latitude, longitude]) => [longitude, latitude]),
-          },
-        },
-      ],
-    };
-  }, [history]);
+  const smokeCoordinates = useMemo(
+    () =>
+      (history?.smokeTrack ?? []).map(([latitude, longitude]) => ({
+        latitude,
+        longitude,
+      })),
+    [history],
+  );
 
   const refreshAll = useCallback(async () => {
     await Promise.all([
@@ -166,9 +135,9 @@ export default function MapScreen() {
   }, [loadClouds, loadWind, refresh]);
 
   const scheduleWindRefresh = useCallback(
-    (rawBounds: [number, number, number, number]) => {
+    (region: Region) => {
       if (!windEnabled) return;
-      const bounds = clampBounds(rawBounds);
+      const bounds = clampRegion(region);
       if (!bounds) return;
       if (windRefreshTimer.current) clearTimeout(windRefreshTimer.current);
       windRefreshTimer.current = setTimeout(() => {
@@ -179,7 +148,6 @@ export default function MapScreen() {
   );
 
   const selectBaseMap = useCallback((id: BaseMapId) => {
-    if (!ARCGIS_BASEMAPS_CONFIGURED) return;
     setBaseMapId(id);
   }, []);
 
@@ -248,7 +216,7 @@ export default function MapScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Aggiorna tutti i dati"
-          disabled={isRefreshing || isWindLoading || isCloudLoading || isBasemapLoading}
+          disabled={isRefreshing || isWindLoading || isCloudLoading}
           onPress={() => void refreshAll()}
           style={({ pressed }) => [
             styles.refreshButton,
@@ -259,7 +227,7 @@ export default function MapScreen() {
             },
           ]}
         >
-          {isRefreshing || isWindLoading || isCloudLoading || isBasemapLoading ? (
+          {isRefreshing || isWindLoading || isCloudLoading ? (
             <ActivityIndicator color={theme.accent} />
           ) : (
             <Text style={[styles.refreshText, { color: theme.accent }]}>↻</Text>
@@ -294,13 +262,11 @@ export default function MapScreen() {
               <Pressable
                 key={id}
                 accessibilityRole="button"
-                accessibilityState={{ selected: active, disabled: !definition.available }}
-                disabled={!definition.available}
+                accessibilityState={{ selected: active }}
                 onPress={() => selectBaseMap(id)}
                 style={[
                   styles.segment,
                   active && { backgroundColor: theme.accentSoft },
-                  !definition.available && styles.disabledControl,
                 ]}
               >
                 <Text style={[styles.segmentLabel, { color: active ? theme.accent : theme.textMuted }]}>
@@ -331,92 +297,59 @@ export default function MapScreen() {
         />
       </View>
 
-      {basemapError ? (
-        <Text style={[styles.configurationNotice, { color: theme.warning }]}>
-          {basemapError}
-        </Text>
-      ) : isUsingFallbackMap ? (
-        <Text style={[styles.configurationNotice, { color: theme.warning }]}>
-          Mappa OpenFreeMap attiva come riserva.
-        </Text>
-      ) : null}
-
       <View style={[styles.mapFrame, { borderColor: theme.border, backgroundColor: theme.surfaceMuted }]}>
-        <Map
-          key={`${baseMapId}-${isUsingFallbackMap ? "fallback" : "arcgis"}`}
-          ref={mapRef}
+        <MapView
           style={styles.map}
-          mapStyle={resolvedMapStyle}
-          attribution
-          attributionPosition={{ bottom: 8, right: 8 }}
-          compass
-          compassPosition={{ top: 10, right: 10 }}
-          scaleBar
-          scaleBarPosition={{ bottom: 10, left: 10 }}
-          onDidFailLoadingMap={handleNativeFailure}
-          onRegionDidChange={(event) => scheduleWindRefresh(event.nativeEvent.bounds)}
+          initialRegion={INITIAL_REGION}
+          mapType={baseMap.mapType}
+          loadingEnabled
+          loadingIndicatorColor={theme.accent}
+          loadingBackgroundColor={theme.surfaceMuted}
+          showsCompass
+          showsScale
+          showsBuildings
+          showsPointsOfInterests
+          onMapReady={() => setIsMapReady(true)}
+          onRegionChangeComplete={scheduleWindRefresh}
         >
-          <Camera
-            initialViewState={{
-              center: SARDINIA_CENTER,
-              zoom: SARDINIA_INITIAL_ZOOM,
-            }}
-          />
+          {visibleClouds.map((sample, index) => (
+            <Circle
+              key={`cloud-${index}`}
+              center={{
+                latitude: sample.latitude,
+                longitude: sample.longitude,
+              }}
+              radius={16_000 + sample.cover * 260}
+              fillColor={cloudOpacity(sample.cover)}
+              strokeColor="transparent"
+              zIndex={1}
+            />
+          ))}
 
-          {cloudEnabled && cloudGeoJson.features.length ? (
-            <GeoJSONSource id="cloud-cover" data={cloudGeoJson}>
-              <Layer
-                id="cloud-cover-circles"
-                type="circle"
-                paint={{
-                  "circle-color": "#eef5f8",
-                  "circle-radius": [
-                    "interpolate",
-                    ["linear"],
-                    ["get", "cover"],
-                    8,
-                    16,
-                    100,
-                    48,
-                  ],
-                  "circle-opacity": [
-                    "interpolate",
-                    ["linear"],
-                    ["get", "cover"],
-                    8,
-                    0.08,
-                    100,
-                    0.58,
-                  ],
-                  "circle-blur": 0.75,
-                  "circle-stroke-width": 0,
-                }}
-              />
-            </GeoJSONSource>
-          ) : null}
-
-          {history?.smokeTrack?.length ? (
-            <GeoJSONSource id="smoke-track" data={smokeGeoJson}>
-              <Layer
-                id="smoke-track-line"
-                type="line"
-                paint={{
-                  "line-color": "#7e6bc4",
-                  "line-width": 5,
-                  "line-opacity": 0.9,
-                  "line-dasharray": [1.5, 1.2],
-                }}
-              />
-            </GeoJSONSource>
+          {smokeCoordinates.length >= 2 ? (
+            <Polyline
+              coordinates={smokeCoordinates}
+              strokeColor="#7e6bc4e6"
+              strokeWidth={5}
+              lineDashPattern={[9, 6]}
+              lineCap="round"
+              lineJoin="round"
+              zIndex={4}
+            />
           ) : null}
 
           {windEnabled
             ? windSamples.map((sample, index) => (
                 <Marker
                   key={`wind-${index}`}
-                  id={`wind-${index}`}
-                  lngLat={[sample.longitude, sample.latitude]}
-                  anchor="center"
+                  identifier={`wind-${index}`}
+                  coordinate={{
+                    latitude: sample.latitude,
+                    longitude: sample.longitude,
+                  }}
+                  anchor={{ x: 0.5, y: 0.5 }}
+                  tracksViewChanges={false}
+                  zIndex={3}
                 >
                   <View collapsable={false} style={styles.windMarker}>
                     <View
@@ -444,9 +377,14 @@ export default function MapScreen() {
           {visibleFires.map((fire) => (
             <Marker
               key={fire.id}
-              id={fire.id}
-              lngLat={[fire.longitude, fire.latitude]}
+              identifier={fire.id}
+              coordinate={{
+                latitude: fire.latitude,
+                longitude: fire.longitude,
+              }}
               onPress={() => selectFire(fire)}
+              anchor={{ x: 0.5, y: 0.5 }}
+              zIndex={5}
             >
               <View
                 collapsable={false}
@@ -461,20 +399,14 @@ export default function MapScreen() {
               />
             </Marker>
           ))}
-        </Map>
+        </MapView>
 
-        {isLoading || isBasemapLoading ? (
+        {isLoading || !isMapReady ? (
           <View style={[styles.loadingOverlay, { backgroundColor: `${theme.background}d9` }]}>
             <ActivityIndicator size="large" color={theme.accent} />
             <Text style={[styles.loadingText, { color: theme.text }]}>Caricamento della mappa...</Text>
           </View>
         ) : null}
-
-        <View style={[styles.mapAttribution, { backgroundColor: `${theme.surface}df` }]}>
-          <Text style={[styles.mapAttributionText, { color: theme.textMuted }]} numberOfLines={1}>
-            {isUsingFallbackMap ? FALLBACK_MAP_ATTRIBUTION : baseMap.attribution}
-          </Text>
-        </View>
 
         <View style={[styles.legend, { backgroundColor: `${theme.surface}ee`, borderColor: theme.border }]}>
           <View style={[styles.legendDot, { backgroundColor: severityColors.high }]} />
@@ -724,11 +656,9 @@ const styles = StyleSheet.create({
   segmentedControl: { flex: 1, flexDirection: "row", borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, padding: 3 },
   segment: { flex: 1, minHeight: 32, borderRadius: 9, alignItems: "center", justifyContent: "center" },
   segmentLabel: { fontSize: 10, fontWeight: "800", letterSpacing: 0.4 },
-  disabledControl: { opacity: 0.35 },
   layerToggle: { minHeight: 38, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 9 },
   layerSymbol: { fontSize: 15, fontWeight: "800" },
   layerLabel: { fontSize: 10, fontWeight: "800" },
-  configurationNotice: { fontSize: 10, lineHeight: 14 },
   mapFrame: { flex: 1, minHeight: 285, overflow: "hidden", borderRadius: 20, borderWidth: StyleSheet.hairlineWidth },
   map: { flex: 1 },
   marker: { width: 18, height: 18, borderRadius: 9, borderWidth: 3 },
@@ -739,9 +669,7 @@ const styles = StyleSheet.create({
   windSpeed: { marginTop: -2, minWidth: 27, color: "#ffffff", backgroundColor: "#122b38dd", borderRadius: 7, overflow: "hidden", textAlign: "center", paddingHorizontal: 4, paddingVertical: 1, fontSize: 9, fontWeight: "800" },
   loadingOverlay: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0, alignItems: "center", justifyContent: "center", gap: spacing.md },
   loadingText: { fontSize: 14, fontWeight: "600" },
-  mapAttribution: { position: "absolute", right: 8, bottom: 42, maxWidth: "70%", borderRadius: 7, paddingHorizontal: 6, paddingVertical: 3 },
-  mapAttributionText: { fontSize: 8, lineHeight: 10 },
-  legend: { position: "absolute", left: 9, bottom: 9, flexDirection: "row", alignItems: "center", gap: 6, borderRadius: 999, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 9, paddingVertical: 6 },
+  legend: { position: "absolute", left: 9, top: 9, flexDirection: "row", alignItems: "center", gap: 6, borderRadius: 999, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 9, paddingVertical: 6 },
   legendDot: { width: 8, height: 8, borderRadius: 4 },
   legendText: { fontSize: 9, fontWeight: "700" },
   cloudTimeline: { minHeight: 54, flexDirection: "row", alignItems: "center", gap: 8, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 8, paddingVertical: 7 },
