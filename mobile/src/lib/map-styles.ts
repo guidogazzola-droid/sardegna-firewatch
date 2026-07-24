@@ -30,7 +30,9 @@ function arcgisStyle(styleName: string): string {
     f: "json",
     language: "it",
     places: "none",
-    echoToken: "true",
+    // Native tile, glyph and sprite requests are authenticated separately by
+    // TransformRequestManager, so the token is not echoed into the style JSON.
+    echoToken: "false",
     token: arcgisAccessToken,
   });
   return `https://basemapstyles-api.arcgis.com/arcgis/rest/services/styles/v2/styles/arcgis/${styleName}?${query.toString()}`;
