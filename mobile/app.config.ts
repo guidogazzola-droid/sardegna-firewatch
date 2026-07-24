@@ -54,7 +54,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       },
     ],
     "expo-notifications",
-    "@maplibre/maplibre-react-native",
   ],
   experiments: {
     typedRoutes: true,

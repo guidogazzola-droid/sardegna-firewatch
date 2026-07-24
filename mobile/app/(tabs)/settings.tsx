@@ -64,7 +64,7 @@ export default function SettingsScreen() {
           <ExternalLink label="NASA FIRMS" url="https://firms.modaps.eosdis.nasa.gov/" />
           <ExternalLink label="Copernicus EFFIS" url="https://forest-fire.emergency.copernicus.eu/" />
           <ExternalLink label="Open-Meteo" url="https://open-meteo.com/" />
-          <ExternalLink label="ArcGIS Basemaps" url="https://developers.arcgis.com/rest/basemap-styles/" />
+          <ExternalLink label="Apple Maps" url="https://www.apple.com/legal/internet-services/maps/" />
           <ExternalLink label="Bollettino Regione Sardegna" url="https://www.sardegnaambiente.it/index.php?c=7093&s=20&v=9&xsl=2273" />
         </Section>
 
