@@ -1,0 +1,64 @@
+name: Build and submit iOS to TestFlight
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/eas-ios-testflight.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: eas-ios-testflight
+  cancel-in-progress: false
+
+jobs:
+  build-and-submit:
+    name: EAS production build and TestFlight submission
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: mobile
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      EXPO_NO_TELEMETRY: "1"
+
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v5
+
+      - name: Require Expo authentication
+        shell: bash
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "::error::The repository secret EXPO_TOKEN is missing."
+            exit 1
+          fi
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.16.0"
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Set up EAS CLI
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install locked dependencies
+        run: npm ci --include=dev --no-audit --no-fund
+
+      - name: Verify Expo project
+        run: |
+          eas whoami
+          eas project:info
+
+      - name: Build iOS and submit to TestFlight
+        run: eas build --platform ios --profile production --non-interactive --auto-submit --wait
