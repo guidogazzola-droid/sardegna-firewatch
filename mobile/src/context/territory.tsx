@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
+  fetchProducts as fetchStoreProducts,
   finishTransaction,
   isTransactionVerifiedIOS,
   type Product,
@@ -15,7 +16,7 @@ import {
   useMemo,
   useState,
 } from "react";
-import { Platform } from "react-native";
+import { Alert, Platform } from "react-native";
 import {
   COUNTRY_PRODUCT_IDS,
   DEFAULT_TERRITORY,
@@ -79,6 +80,9 @@ export function TerritoryProvider({ children }: { children: ReactNode }) {
   const [storeError, setStoreError] = useState<string | null>(null);
   const [storeMessage, setStoreMessage] = useState<string | null>(null);
   const [recentPurchases, setRecentPurchases] = useState<Purchase[]>([]);
+  const [productsFetchedOnDemand, setProductsFetchedOnDemand] = useState<
+    Product[]
+  >([]);
 
   const handlePurchaseSuccess = useCallback(async (purchase: Purchase) => {
     const territory = getTerritoryByProductId(purchase.productId);
@@ -100,22 +104,28 @@ export function TerritoryProvider({ children }: { children: ReactNode }) {
       setStoreError(null);
       setStoreMessage(`${territory.name} è ora disponibile.`);
     } catch (error) {
-      setStoreError(readableStoreError(error));
+      const message = readableStoreError(error);
+      setStoreError(message);
+      Alert.alert("Acquisto non completato", message);
     } finally {
       setIsPurchasing(false);
     }
   }, []);
 
   const handlePurchaseError = useCallback((error: unknown) => {
+    const message = readableStoreError(error);
     setIsPurchasing(false);
-    setStoreError(readableStoreError(error));
+    setStoreError(message);
+    if (message !== "Acquisto annullato.") {
+      Alert.alert("Acquisto non completato", message);
+    }
   }, []);
 
   const {
     connected,
     products,
     availablePurchases,
-    fetchProducts,
+    fetchProducts: refreshProducts,
     getAvailablePurchases,
     requestPurchase,
     restorePurchases,
@@ -160,12 +170,12 @@ export function TerritoryProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!connected) return;
     void Promise.all([
-      fetchProducts({ skus: COUNTRY_PRODUCT_IDS, type: "in-app" }),
+      refreshProducts({ skus: COUNTRY_PRODUCT_IDS, type: "in-app" }),
       getAvailablePurchases(),
     ])
       .catch((error) => setStoreError(readableStoreError(error)))
       .finally(() => setStoreLoaded(true));
-  }, [connected, fetchProducts, getAvailablePurchases]);
+  }, [connected, getAvailablePurchases, refreshProducts]);
 
   const storeEntitlements = useMemo(
     () =>
@@ -203,8 +213,13 @@ export function TerritoryProvider({ children }: { children: ReactNode }) {
   const activeTerritory =
     getTerritory(activeTerritoryId) ?? DEFAULT_TERRITORY;
   const productById = useMemo(
-    () => new Map(products.map((product) => [product.id, product])),
-    [products],
+    () =>
+      new Map(
+        products
+          .concat(productsFetchedOnDemand)
+          .map((product) => [product.id, product]),
+      ),
+    [products, productsFetchedOnDemand],
   );
   const purchaseByProductId = useMemo(
     () =>
@@ -250,16 +265,45 @@ export function TerritoryProvider({ children }: { children: ReactNode }) {
   const purchaseTerritory = useCallback(
     async (territory: Territory) => {
       if (territory.free || !territory.productId || isPurchasing) return;
-      if (!connected || !productById.has(territory.productId)) {
-        setStoreError(
-          "Questo Paese non è ancora disponibile su App Store.",
-        );
+      if (!connected) {
+        const message =
+          "App Store non è collegato. Controlla la connessione e riprova.";
+        setStoreError(message);
+        Alert.alert("Acquisto non disponibile", message);
         return;
       }
       setIsPurchasing(true);
       setStoreError(null);
-      setStoreMessage(null);
+      setStoreMessage(`Verifica disponibilità di ${territory.name}…`);
       try {
+        let product = productById.get(territory.productId);
+        if (!product) {
+          const fetched = ((await fetchStoreProducts({
+            skus: [territory.productId],
+            type: "in-app",
+          })) ?? []) as Product[];
+          const fetchedProduct = fetched.find(
+            (item) => item.id === territory.productId,
+          );
+          product = fetchedProduct;
+          if (fetchedProduct) {
+            setProductsFetchedOnDemand((current) => [
+              ...current.filter((item) => item.id !== fetchedProduct.id),
+              fetchedProduct,
+            ]);
+          }
+        }
+        if (!product) {
+          const message =
+            `${territory.name} non è ancora disponibile su App Store. ` +
+            "La configurazione del prodotto potrebbe essere ancora in elaborazione.";
+          setIsPurchasing(false);
+          setStoreMessage(null);
+          setStoreError(message);
+          Alert.alert("Acquisto non disponibile", message);
+          return;
+        }
+        setStoreMessage(null);
         await requestPurchase({
           request: {
             apple: { sku: territory.productId },
@@ -268,8 +312,13 @@ export function TerritoryProvider({ children }: { children: ReactNode }) {
           type: "in-app",
         });
       } catch (error) {
+        const message = readableStoreError(error);
         setIsPurchasing(false);
-        setStoreError(readableStoreError(error));
+        setStoreMessage(null);
+        setStoreError(message);
+        if (message !== "Acquisto annullato.") {
+          Alert.alert("Acquisto non completato", message);
+        }
       }
     },
     [connected, isPurchasing, productById, requestPurchase],
