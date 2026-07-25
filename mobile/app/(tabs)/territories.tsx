@@ -159,12 +159,22 @@ function TerritoryRow({
       ? "Apri"
       : price;
   return (
-    <View
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${actionLabel} ${territory.name}`}
+      accessibilityHint={
+        unlocked
+          ? `Seleziona ${territory.name} come territorio attivo`
+          : `Acquista l'accesso permanente a ${territory.name}`
+      }
+      disabled={selected || busy}
+      onPress={onPress}
       style={[
         styles.row,
         {
           backgroundColor: theme.surface,
           borderColor: selected ? `${theme.accent}88` : theme.border,
+          opacity: busy ? 0.72 : 1,
         },
       ]}
     >
@@ -197,11 +207,8 @@ function TerritoryRow({
               : "Mappa, rilevazioni, meteo e avvisi"}
         </Text>
       </View>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`${actionLabel} ${territory.name}`}
-        disabled={selected || busy || (!unlocked && !connected)}
-        onPress={onPress}
+      <View
+        pointerEvents="none"
         style={[
           styles.action,
           {
@@ -220,8 +227,8 @@ function TerritoryRow({
         >
           {actionLabel}
         </Text>
-      </Pressable>
-    </View>
+      </View>
+    </Pressable>
   );
 }
 
