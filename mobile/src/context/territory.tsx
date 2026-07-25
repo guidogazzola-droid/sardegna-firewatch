@@ -17,6 +17,7 @@ import {
   useState,
 } from "react";
 import { Alert, Platform } from "react-native";
+import { translate, useI18n, type AppLanguage } from "../i18n";
 import {
   COUNTRY_PRODUCT_IDS,
   DEFAULT_TERRITORY,
@@ -55,21 +56,27 @@ function purchaseIsUsable(purchase: Purchase): boolean {
   );
 }
 
-function readableStoreError(error: unknown): string {
-  if (
+function isUserCancelled(error: unknown): boolean {
+  return (
     typeof error === "object" &&
     error !== null &&
     "code" in error &&
     String(error.code).includes("user-cancelled")
-  ) {
-    return "Acquisto annullato.";
-  }
+  );
+}
+
+function readableStoreError(
+  error: unknown,
+  language: AppLanguage,
+): string {
+  if (isUserCancelled(error)) return translate("store.cancelled", {}, language);
   return error instanceof Error && error.message
     ? error.message
-    : "App Store non disponibile. Riprova tra poco.";
+    : translate("store.unavailable", {}, language);
 }
 
 export function TerritoryProvider({ children }: { children: ReactNode }) {
+  const { language, t, territoryName } = useI18n();
   const [activeTerritoryId, setActiveTerritoryId] = useState(
     DEFAULT_TERRITORY.id,
   );
@@ -91,7 +98,7 @@ export function TerritoryProvider({ children }: { children: ReactNode }) {
       const verified =
         Platform.OS !== "ios" ||
         (await isTransactionVerifiedIOS(purchase.productId));
-      if (!verified) throw new Error("Acquisto non verificato da App Store.");
+      if (!verified) throw new Error(t("store.unverified"));
       await finishTransaction({ purchase, isConsumable: false });
       setCachedEntitlements((current) => [
         ...new Set([...current, territory.id]),
@@ -102,24 +109,26 @@ export function TerritoryProvider({ children }: { children: ReactNode }) {
       ]);
       setActiveTerritoryId(territory.id);
       setStoreError(null);
-      setStoreMessage(`${territory.name} è ora disponibile.`);
+      setStoreMessage(
+        t("store.available", { territory: territoryName(territory) }),
+      );
     } catch (error) {
-      const message = readableStoreError(error);
+      const message = readableStoreError(error, language);
       setStoreError(message);
-      Alert.alert("Acquisto non completato", message);
+      Alert.alert(t("store.completedTitle"), message);
     } finally {
       setIsPurchasing(false);
     }
-  }, []);
+  }, [language, t, territoryName]);
 
   const handlePurchaseError = useCallback((error: unknown) => {
-    const message = readableStoreError(error);
+    const message = readableStoreError(error, language);
     setIsPurchasing(false);
     setStoreError(message);
-    if (message !== "Acquisto annullato.") {
-      Alert.alert("Acquisto non completato", message);
+    if (!isUserCancelled(error)) {
+      Alert.alert(t("store.completedTitle"), message);
     }
-  }, []);
+  }, [language, t]);
 
   const {
     connected,
@@ -132,7 +141,7 @@ export function TerritoryProvider({ children }: { children: ReactNode }) {
   } = useIAP({
     onPurchaseSuccess: (purchase) => void handlePurchaseSuccess(purchase),
     onPurchaseError: handlePurchaseError,
-    onError: (error) => setStoreError(readableStoreError(error)),
+    onError: (error) => setStoreError(readableStoreError(error, language)),
   });
 
   useEffect(() => {
@@ -173,9 +182,9 @@ export function TerritoryProvider({ children }: { children: ReactNode }) {
       refreshProducts({ skus: COUNTRY_PRODUCT_IDS, type: "in-app" }),
       getAvailablePurchases(),
     ])
-      .catch((error) => setStoreError(readableStoreError(error)))
+      .catch((error) => setStoreError(readableStoreError(error, language)))
       .finally(() => setStoreLoaded(true));
-  }, [connected, getAvailablePurchases, refreshProducts]);
+  }, [connected, getAvailablePurchases, language, refreshProducts]);
 
   const storeEntitlements = useMemo(
     () =>
@@ -239,10 +248,10 @@ export function TerritoryProvider({ children }: { children: ReactNode }) {
 
   const displayPrice = useCallback(
     (territory: Territory) => {
-      if (territory.free) return "Gratis";
+      if (territory.free) return t("store.free");
       return productById.get(territory.productId ?? "")?.displayPrice ?? "CHF 5";
     },
-    [productById],
+    [productById, t],
   );
 
   const purchaseToken = useCallback(
@@ -255,26 +264,30 @@ export function TerritoryProvider({ children }: { children: ReactNode }) {
     async (territory: Territory) => {
       if (!unlockedTerritoryIds.has(territory.id)) return false;
       setActiveTerritoryId(territory.id);
-      setStoreMessage(`${territory.name} selezionata.`);
+      setStoreMessage(
+        t("store.selected", { territory: territoryName(territory) }),
+      );
       setStoreError(null);
       return true;
     },
-    [unlockedTerritoryIds],
+    [t, territoryName, unlockedTerritoryIds],
   );
 
   const purchaseTerritory = useCallback(
     async (territory: Territory) => {
       if (territory.free || !territory.productId || isPurchasing) return;
       if (!connected) {
-        const message =
-          "App Store non è collegato. Controlla la connessione e riprova.";
+        const message = t("store.notConnected");
         setStoreError(message);
-        Alert.alert("Acquisto non disponibile", message);
+        Alert.alert(t("store.unavailableTitle"), message);
         return;
       }
       setIsPurchasing(true);
       setStoreError(null);
-      setStoreMessage(`Verifica disponibilità di ${territory.name}…`);
+      const localizedName = territoryName(territory);
+      setStoreMessage(
+        t("store.checking", { territory: localizedName }),
+      );
       try {
         let product = productById.get(territory.productId);
         if (!product) {
@@ -294,13 +307,13 @@ export function TerritoryProvider({ children }: { children: ReactNode }) {
           }
         }
         if (!product) {
-          const message =
-            `${territory.name} non è ancora disponibile su App Store. ` +
-            "La configurazione del prodotto potrebbe essere ancora in elaborazione.";
+          const message = t("store.productPending", {
+            territory: localizedName,
+          });
           setIsPurchasing(false);
           setStoreMessage(null);
           setStoreError(message);
-          Alert.alert("Acquisto non disponibile", message);
+          Alert.alert(t("store.unavailableTitle"), message);
           return;
         }
         setStoreMessage(null);
@@ -312,21 +325,29 @@ export function TerritoryProvider({ children }: { children: ReactNode }) {
           type: "in-app",
         });
       } catch (error) {
-        const message = readableStoreError(error);
+        const message = readableStoreError(error, language);
         setIsPurchasing(false);
         setStoreMessage(null);
         setStoreError(message);
-        if (message !== "Acquisto annullato.") {
-          Alert.alert("Acquisto non completato", message);
+        if (!isUserCancelled(error)) {
+          Alert.alert(t("store.completedTitle"), message);
         }
       }
     },
-    [connected, isPurchasing, productById, requestPurchase],
+    [
+      connected,
+      isPurchasing,
+      language,
+      productById,
+      requestPurchase,
+      t,
+      territoryName,
+    ],
   );
 
   const restoreCountryPurchases = useCallback(async () => {
     if (!connected) {
-      setStoreError("App Store non è ancora collegato.");
+      setStoreError(t("store.notConnectedShort"));
       return;
     }
     setIsPurchasing(true);
@@ -334,13 +355,13 @@ export function TerritoryProvider({ children }: { children: ReactNode }) {
     setStoreMessage(null);
     try {
       await restorePurchases();
-      setStoreMessage("Acquisti ripristinati.");
+      setStoreMessage(t("store.restored"));
     } catch (error) {
-      setStoreError(readableStoreError(error));
+      setStoreError(readableStoreError(error, language));
     } finally {
       setIsPurchasing(false);
     }
-  }, [connected, restorePurchases]);
+  }, [connected, language, restorePurchases, t]);
 
   const value = useMemo<TerritoryContextValue>(
     () => ({

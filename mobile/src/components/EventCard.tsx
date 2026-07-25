@@ -1,10 +1,18 @@
 import { StyleSheet, Text, View } from "react-native";
-import { confidenceLabel, formatAge, formatObservation, severityLabel } from "../lib/format";
+import { useI18n } from "../i18n";
+import {
+  confidenceLabel,
+  formatAge,
+  formatNumber,
+  formatObservation,
+  severityLabel,
+} from "../lib/format";
 import type { FireDetection } from "../lib/types";
 import { severityColors, spacing, useAppTheme } from "../theme";
 
 export function EventCard({ fire, compact = false }: { fire: FireDetection; compact?: boolean }) {
   const theme = useAppTheme();
+  const { language, t } = useI18n();
   const severityColor = severityColors[fire.severity];
 
   return (
@@ -20,13 +28,18 @@ export function EventCard({ fire, compact = false }: { fire: FireDetection; comp
       <View style={styles.topRow}>
         <View style={[styles.dot, { backgroundColor: severityColor }]} />
         <View style={styles.titleColumn}>
-          <Text style={[styles.title, { color: theme.text }]}>Rilevazione termica</Text>
+          <Text style={[styles.title, { color: theme.text }]}>
+            {t("event.thermalDetection")}
+          </Text>
           <Text style={[styles.subtitle, { color: theme.textMuted }]}>
-            {formatObservation(fire.observedAt)} · {formatAge(fire.ageMinutes)}
+            {formatObservation(fire.observedAt, language)} ·{" "}
+            {formatAge(fire.ageMinutes, language)}
           </Text>
         </View>
         <View style={[styles.badge, { backgroundColor: `${severityColor}1f` }]}>
-          <Text style={[styles.badgeText, { color: severityColor }]}>{severityLabel(fire.severity)}</Text>
+          <Text style={[styles.badgeText, { color: severityColor }]}>
+            {severityLabel(fire.severity, language)}
+          </Text>
         </View>
       </View>
 
@@ -34,12 +47,25 @@ export function EventCard({ fire, compact = false }: { fire: FireDetection; comp
         <>
           <View style={[styles.divider, { backgroundColor: theme.border }]} />
           <View style={styles.metricsRow}>
-            <Metric label="Affidabilita" value={confidenceLabel(fire.confidence)} />
-            <Metric label="Sensore" value={fire.instrument || "n.d."} />
-            <Metric label="FRP" value={fire.frp === null ? "n.d." : `${fire.frp.toFixed(1)} MW`} />
+            <Metric
+              label={t("event.reliability")}
+              value={confidenceLabel(fire.confidence, language)}
+            />
+            <Metric
+              label={t("event.sensor")}
+              value={fire.instrument || t("common.notAvailable")}
+            />
+            <Metric
+              label="FRP"
+              value={
+                fire.frp === null
+                  ? t("common.notAvailable")
+                  : `${formatNumber(fire.frp, 1, language)} MW`
+              }
+            />
           </View>
           <Text style={[styles.notice, { color: theme.textMuted }]}>
-            Anomalia osservata da satellite; non equivale automaticamente a un incendio confermato.
+            {t("event.notice")}
           </Text>
         </>
       ) : null}

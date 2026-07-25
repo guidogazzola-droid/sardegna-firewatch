@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import { verifyTerritoryEntitlement } from "../lib/app-store.js";
 import { normalizeFireRow } from "../lib/firms.js";
@@ -19,6 +20,28 @@ test("the catalog contains Sardinia plus 47 European country products", () => {
         .map((territory) => territory.productId),
     ).size,
     47,
+  );
+});
+
+test("every country product has four App Store localizations within Apple limits", () => {
+  const lines = readFileSync(
+    new URL("../data/app-store-product-localizations.csv", import.meta.url),
+    "utf8",
+  )
+    .trim()
+    .split("\n");
+  assert.equal(lines.length, 1 + 47 * 4);
+  const localeCounts = new Map();
+  for (const line of lines.slice(1)) {
+    const [, locale] = line.split(",", 3);
+    localeCounts.set(locale, (localeCounts.get(locale) || 0) + 1);
+    const description = line.match(/,"([^"]*)"$/)?.[1];
+    assert.ok(description);
+    assert.ok(description.length <= 45);
+  }
+  assert.deepEqual(
+    Object.fromEntries(localeCounts),
+    { it: 47, "en-US": 47, "fr-FR": 47, "de-DE": 47 },
   );
 });
 

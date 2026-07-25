@@ -1,0 +1,290 @@
+{
+  "sardinia": {
+    "it": "Sardegna",
+    "en": "Sardinia",
+    "fr": "Sardaigne",
+    "de": "Sardinien"
+  },
+  "albania": {
+    "it": "Albania",
+    "en": "Albania",
+    "fr": "Albanie",
+    "de": "Albanien"
+  },
+  "andorra": {
+    "it": "Andorra",
+    "en": "Andorra",
+    "fr": "Andorre",
+    "de": "Andorra"
+  },
+  "austria": {
+    "it": "Austria",
+    "en": "Austria",
+    "fr": "Autriche",
+    "de": "Österreich"
+  },
+  "belgium": {
+    "it": "Belgio",
+    "en": "Belgium",
+    "fr": "Belgique",
+    "de": "Belgien"
+  },
+  "belarus": {
+    "it": "Bielorussia",
+    "en": "Belarus",
+    "fr": "Biélorussie",
+    "de": "Belarus"
+  },
+  "bosnia-herzegovina": {
+    "it": "Bosnia ed Erzegovina",
+    "en": "Bosnia & Herzegovina",
+    "fr": "Bosnie-Herzégovine",
+    "de": "Bosnien und Herzegowina"
+  },
+  "bulgaria": {
+    "it": "Bulgaria",
+    "en": "Bulgaria",
+    "fr": "Bulgarie",
+    "de": "Bulgarien"
+  },
+  "czechia": {
+    "it": "Cechia",
+    "en": "Czechia",
+    "fr": "Tchéquie",
+    "de": "Tschechien"
+  },
+  "cyprus": {
+    "it": "Cipro",
+    "en": "Cyprus",
+    "fr": "Chypre",
+    "de": "Zypern"
+  },
+  "vatican-city": {
+    "it": "Città del Vaticano",
+    "en": "Vatican City",
+    "fr": "État de la Cité du Vatican",
+    "de": "Vatikanstadt"
+  },
+  "croatia": {
+    "it": "Croazia",
+    "en": "Croatia",
+    "fr": "Croatie",
+    "de": "Kroatien"
+  },
+  "denmark": {
+    "it": "Danimarca",
+    "en": "Denmark",
+    "fr": "Danemark",
+    "de": "Dänemark"
+  },
+  "estonia": {
+    "it": "Estonia",
+    "en": "Estonia",
+    "fr": "Estonie",
+    "de": "Estland"
+  },
+  "finland": {
+    "it": "Finlandia",
+    "en": "Finland",
+    "fr": "Finlande",
+    "de": "Finnland"
+  },
+  "france": {
+    "it": "Francia",
+    "en": "France",
+    "fr": "France",
+    "de": "Frankreich"
+  },
+  "germany": {
+    "it": "Germania",
+    "en": "Germany",
+    "fr": "Allemagne",
+    "de": "Deutschland"
+  },
+  "greece": {
+    "it": "Grecia",
+    "en": "Greece",
+    "fr": "Grèce",
+    "de": "Griechenland"
+  },
+  "ireland": {
+    "it": "Irlanda",
+    "en": "Ireland",
+    "fr": "Irlande",
+    "de": "Irland"
+  },
+  "iceland": {
+    "it": "Islanda",
+    "en": "Iceland",
+    "fr": "Islande",
+    "de": "Island"
+  },
+  "italy": {
+    "it": "Italia",
+    "en": "Italy",
+    "fr": "Italie",
+    "de": "Italien"
+  },
+  "kosovo": {
+    "it": "Kosovo",
+    "en": "Kosovo",
+    "fr": "Kosovo",
+    "de": "Kosovo"
+  },
+  "latvia": {
+    "it": "Lettonia",
+    "en": "Latvia",
+    "fr": "Lettonie",
+    "de": "Lettland"
+  },
+  "liechtenstein": {
+    "it": "Liechtenstein",
+    "en": "Liechtenstein",
+    "fr": "Liechtenstein",
+    "de": "Liechtenstein"
+  },
+  "lithuania": {
+    "it": "Lituania",
+    "en": "Lithuania",
+    "fr": "Lituanie",
+    "de": "Litauen"
+  },
+  "luxembourg": {
+    "it": "Lussemburgo",
+    "en": "Luxembourg",
+    "fr": "Luxembourg",
+    "de": "Luxemburg"
+  },
+  "north-macedonia": {
+    "it": "Macedonia del Nord",
+    "en": "North Macedonia",
+    "fr": "Macédoine du Nord",
+    "de": "Nordmazedonien"
+  },
+  "malta": {
+    "it": "Malta",
+    "en": "Malta",
+    "fr": "Malte",
+    "de": "Malta"
+  },
+  "moldova": {
+    "it": "Moldavia",
+    "en": "Moldova",
+    "fr": "Moldavie",
+    "de": "Republik Moldau"
+  },
+  "monaco": {
+    "it": "Monaco",
+    "en": "Monaco",
+    "fr": "Monaco",
+    "de": "Monaco"
+  },
+  "montenegro": {
+    "it": "Montenegro",
+    "en": "Montenegro",
+    "fr": "Monténégro",
+    "de": "Montenegro"
+  },
+  "norway": {
+    "it": "Norvegia",
+    "en": "Norway",
+    "fr": "Norvège",
+    "de": "Norwegen"
+  },
+  "netherlands": {
+    "it": "Paesi Bassi",
+    "en": "Netherlands",
+    "fr": "Pays-Bas",
+    "de": "Niederlande"
+  },
+  "poland": {
+    "it": "Polonia",
+    "en": "Poland",
+    "fr": "Pologne",
+    "de": "Polen"
+  },
+  "portugal": {
+    "it": "Portogallo",
+    "en": "Portugal",
+    "fr": "Portugal",
+    "de": "Portugal"
+  },
+  "united-kingdom": {
+    "it": "Regno Unito",
+    "en": "United Kingdom",
+    "fr": "Royaume-Uni",
+    "de": "Vereinigtes Königreich"
+  },
+  "romania": {
+    "it": "Romania",
+    "en": "Romania",
+    "fr": "Roumanie",
+    "de": "Rumänien"
+  },
+  "russia": {
+    "it": "Russia",
+    "en": "Russia",
+    "fr": "Russie",
+    "de": "Russland"
+  },
+  "san-marino": {
+    "it": "San Marino",
+    "en": "San Marino",
+    "fr": "Saint-Marin",
+    "de": "San Marino"
+  },
+  "serbia": {
+    "it": "Serbia",
+    "en": "Serbia",
+    "fr": "Serbie",
+    "de": "Serbien"
+  },
+  "slovakia": {
+    "it": "Slovacchia",
+    "en": "Slovakia",
+    "fr": "Slovaquie",
+    "de": "Slowakei"
+  },
+  "slovenia": {
+    "it": "Slovenia",
+    "en": "Slovenia",
+    "fr": "Slovénie",
+    "de": "Slowenien"
+  },
+  "spain": {
+    "it": "Spagna",
+    "en": "Spain",
+    "fr": "Espagne",
+    "de": "Spanien"
+  },
+  "sweden": {
+    "it": "Svezia",
+    "en": "Sweden",
+    "fr": "Suède",
+    "de": "Schweden"
+  },
+  "switzerland": {
+    "it": "Svizzera",
+    "en": "Switzerland",
+    "fr": "Suisse",
+    "de": "Schweiz"
+  },
+  "turkey": {
+    "it": "Turchia",
+    "en": "Türkiye",
+    "fr": "Turquie",
+    "de": "Türkei"
+  },
+  "ukraine": {
+    "it": "Ucraina",
+    "en": "Ukraine",
+    "fr": "Ukraine",
+    "de": "Ukraine"
+  },
+  "hungary": {
+    "it": "Ungheria",
+    "en": "Hungary",
+    "fr": "Hongrie",
+    "de": "Ungarn"
+  }
+}

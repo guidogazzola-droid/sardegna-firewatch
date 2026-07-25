@@ -8,11 +8,13 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTerritory } from "../../src/context/territory";
+import { useI18n } from "../../src/i18n";
 import type { Territory } from "../../src/lib/territories";
 import { spacing, useAppTheme } from "../../src/theme";
 
 export default function TerritoriesScreen() {
   const theme = useAppTheme();
+  const { t } = useI18n();
   const {
     territories,
     activeTerritory,
@@ -42,11 +44,10 @@ export default function TerritoriesScreen() {
           <View style={styles.headerArea}>
             <View style={styles.header}>
               <Text style={[styles.title, { color: theme.text }]}>
-                Territori
+                {t("territories.title")}
               </Text>
               <Text style={[styles.subtitle, { color: theme.textMuted }]}>
-                La Sardegna è inclusa. Ogni Paese si acquista una sola volta e
-                resta disponibile sul tuo Apple ID.
+                {t("territories.subtitle")}
               </Text>
             </View>
             <View
@@ -59,18 +60,17 @@ export default function TerritoriesScreen() {
               ]}
             >
               <Text style={[styles.modelTitle, { color: theme.accent }]}>
-                Sardegna gratis · Paesi da CHF 5
+                {t("territories.modelTitle")}
               </Text>
               <Text style={[styles.modelText, { color: theme.textMuted }]}>
-                Il prezzo effettivo è quello mostrato da App Store nella valuta
-                del Paese dell’utente. Gli acquisti non sono abbonamenti.
+                {t("territories.modelBody")}
               </Text>
             </View>
             {isLoading ? (
               <View style={styles.storeStatus}>
                 <ActivityIndicator color={theme.accent} />
                 <Text style={[styles.storeStatusText, { color: theme.textMuted }]}>
-                  Collegamento ad App Store…
+                  {t("territories.connecting")}
                 </Text>
               </View>
             ) : null}
@@ -120,13 +120,12 @@ export default function TerritoriesScreen() {
                 <ActivityIndicator color={theme.accent} />
               ) : (
                 <Text style={[styles.restoreText, { color: theme.accent }]}>
-                  Ripristina acquisti
+                  {t("territories.restore")}
                 </Text>
               )}
             </Pressable>
             <Text style={[styles.footerText, { color: theme.textMuted }]}>
-              Gli sblocchi sono acquisti in‑app non consumabili gestiti da
-              Apple. Non richiediamo un account Sabetta Piro.
+              {t("territories.footer")}
             </Text>
           </View>
         }
@@ -153,19 +152,21 @@ function TerritoryRow({
   onPress: () => void;
 }) {
   const theme = useAppTheme();
+  const { t, territoryName } = useI18n();
+  const name = territoryName(territory);
   const actionLabel = selected
-    ? "In uso"
+    ? t("territories.inUse")
     : unlocked
-      ? "Apri"
+      ? t("territories.open")
       : price;
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${actionLabel} ${territory.name}`}
+      accessibilityLabel={`${actionLabel} ${name}`}
       accessibilityHint={
         unlocked
-          ? `Seleziona ${territory.name} come territorio attivo`
-          : `Acquista l'accesso permanente a ${territory.name}`
+          ? t("territories.selectHint", { territory: name })
+          : t("territories.purchaseHint", { territory: name })
       }
       disabled={selected || busy}
       onPress={onPress}
@@ -197,14 +198,14 @@ function TerritoryRow({
       </View>
       <View style={styles.rowText}>
         <Text style={[styles.countryName, { color: theme.text }]}>
-          {territory.name}
+          {name}
         </Text>
         <Text style={[styles.countryMeta, { color: theme.textMuted }]}>
           {territory.free
-            ? "Inclusa gratuitamente"
+            ? t("territories.included")
             : unlocked
-              ? "Acquistata · accesso permanente"
-              : "Mappa, rilevazioni, meteo e avvisi"}
+              ? t("territories.purchased")
+              : t("territories.features")}
         </Text>
       </View>
       <View

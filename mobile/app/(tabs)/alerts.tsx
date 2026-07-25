@@ -20,7 +20,9 @@ import {
   updateAlertSubscription,
 } from "../../src/lib/api";
 import { PRIVACY_URL } from "../../src/lib/config";
+import { useI18n } from "../../src/i18n";
 import { getPushNotificationToken } from "../../src/lib/push-notifications";
+import { formatCoordinate } from "../../src/lib/format";
 import {
   DEFAULT_TERRITORY,
   getTerritory,
@@ -36,6 +38,7 @@ type MessageKind = "success" | "error" | "info";
 
 export default function AlertsScreen() {
   const theme = useAppTheme();
+  const { language, t, territoryName } = useI18n();
   const { fires, status } = useFireData();
   const { activeTerritory, purchaseToken } = useTerritory();
   const [watchArea, setWatchArea] = useState<WatchArea | null>(null);
@@ -76,6 +79,36 @@ export default function AlertsScreen() {
     });
   }, []);
 
+  useEffect(() => {
+    if (
+      isLoading ||
+      !registration ||
+      registration.language === language
+    ) {
+      return;
+    }
+    let cancelled = false;
+    void updateAlertSubscription({
+      ...registration,
+      language,
+    })
+      .then(async () => {
+        if (cancelled) return;
+        const next = { ...registration, language };
+        setRegistration(next);
+        await AsyncStorage.setItem(
+          REGISTRATION_STORAGE_KEY,
+          JSON.stringify(next),
+        );
+      })
+      .catch(() => {
+        // The next explicit alert action retries the language update.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoading, language, registration]);
+
   const nearbyCount = useMemo(() => {
     if (!watchArea || watchArea.territoryId !== activeTerritory.id) return 0;
     return fires.filter(
@@ -103,12 +136,15 @@ export default function AlertsScreen() {
       await updateAlertSubscription({
         ...registration,
         watchArea: next,
+        language,
         entitlementToken: territory ? purchaseToken(territory) : null,
       });
-      showMessage("Zona aggiornata anche per le notifiche.", "success");
+      showMessage(t("alerts.areaUpdated"), "success");
     } catch (error) {
       showMessage(
-        `${errorMessage(error)} La modifica resta salvata sul telefono; riprova prima di affidarti agli avvisi.`,
+        t("alerts.updateRemoteFailed", {
+          error: errorMessage(error, t("alerts.operationFailed")),
+        }),
         "error",
       );
     }
@@ -121,7 +157,7 @@ export default function AlertsScreen() {
       const permission = await Location.requestForegroundPermissionsAsync();
       if (permission.status !== "granted") {
         showMessage(
-          "Permesso di localizzazione non concesso. Puoi abilitarlo dalle impostazioni di iOS.",
+          t("alerts.locationDenied"),
           "error",
         );
         return;
@@ -137,7 +173,9 @@ export default function AlertsScreen() {
         )
       ) {
         showMessage(
-          `La posizione attuale non si trova in ${activeTerritory.name}. Seleziona il territorio corretto prima di creare la zona.`,
+          t("alerts.outsideTerritory", {
+            territory: territoryName(activeTerritory),
+          }),
           "error",
         );
         return;
@@ -146,7 +184,9 @@ export default function AlertsScreen() {
       await persistWatchArea({
         id: "primary",
         territoryId: activeTerritory.id,
-        name: `La mia posizione · ${activeTerritory.name}`,
+        name: t("alerts.myPosition", {
+          territory: territoryName(activeTerritory),
+        }),
         latitude: location.coords.latitude,
         longitude: location.coords.longitude,
         radiusKm: watchArea?.radiusKm ?? 25,
@@ -157,7 +197,7 @@ export default function AlertsScreen() {
       showMessage(
         error instanceof Error
           ? error.message
-          : "Non e stato possibile determinare la posizione.",
+          : t("alerts.locationFailed"),
         "error",
       );
     } finally {
@@ -191,14 +231,22 @@ export default function AlertsScreen() {
           ...registration,
           expoPushToken,
           watchArea,
+          language,
           entitlementToken: purchaseToken(
             getTerritory(watchArea.territoryId) ?? DEFAULT_TERRITORY,
           ),
         });
+        nextRegistration = { ...registration, language };
+        await AsyncStorage.setItem(
+          REGISTRATION_STORAGE_KEY,
+          JSON.stringify(nextRegistration),
+        );
+        setRegistration(nextRegistration);
       } else {
         const created = await createAlertSubscription({
           expoPushToken,
           watchArea,
+          language,
           entitlementToken: purchaseToken(
             getTerritory(watchArea.territoryId) ?? DEFAULT_TERRITORY,
           ),
@@ -206,6 +254,7 @@ export default function AlertsScreen() {
         nextRegistration = {
           id: created.subscription.id,
           secret: created.secret,
+          language,
         };
         await AsyncStorage.setItem(
           REGISTRATION_STORAGE_KEY,
@@ -214,15 +263,15 @@ export default function AlertsScreen() {
         setRegistration(nextRegistration);
       }
       if (!nextRegistration) {
-        throw new Error("Registrazione notifiche non disponibile.");
+        throw new Error(t("alerts.registrationUnavailable"));
       }
       await sendAlertTest(nextRegistration);
       showMessage(
-        "Notifiche attive. Abbiamo inviato un avviso di prova.",
+        t("alerts.enabled"),
         "success",
       );
     } catch (error) {
-      showMessage(errorMessage(error), "error");
+      showMessage(errorMessage(error, t("alerts.operationFailed")), "error");
     } finally {
       setIsSaving(false);
     }
@@ -234,9 +283,9 @@ export default function AlertsScreen() {
     setMessage(null);
     try {
       await sendAlertTest(registration);
-      showMessage("Notifica di prova inviata.", "success");
+      showMessage(t("alerts.testSent"), "success");
     } catch (error) {
-      showMessage(errorMessage(error), "error");
+      showMessage(errorMessage(error, t("alerts.operationFailed")), "error");
     } finally {
       setIsSaving(false);
     }
@@ -251,13 +300,15 @@ export default function AlertsScreen() {
       await AsyncStorage.removeItem(REGISTRATION_STORAGE_KEY);
       setRegistration(null);
       showMessage(
-        "Notifiche disattivate e zona cancellata dal servizio.",
+        t("alerts.disabled"),
         "success",
       );
       return true;
     } catch (error) {
       showMessage(
-        `${errorMessage(error)} La registrazione remota non e stata cancellata: riprova con una connessione attiva.`,
+        t("alerts.remoteDeleteFailed", {
+          error: errorMessage(error, t("alerts.operationFailed")),
+        }),
         "error",
       );
       return false;
@@ -271,7 +322,7 @@ export default function AlertsScreen() {
     if (registration && !(await disableNotifications())) return;
     setWatchArea(null);
     await AsyncStorage.removeItem(WATCH_AREA_STORAGE_KEY);
-    showMessage("Zona monitorata rimossa.", "success");
+    showMessage(t("alerts.areaRemoved"), "success");
   }
 
   const pushAvailable = status?.alerts?.available ?? status?.sources.alerts ?? false;
@@ -289,9 +340,13 @@ export default function AlertsScreen() {
     >
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.header}>
-          <Text style={[styles.title, { color: theme.text }]}>Avvisi</Text>
+          <Text style={[styles.title, { color: theme.text }]}>
+            {t("alerts.title")}
+          </Text>
           <Text style={[styles.subtitle, { color: theme.textMuted }]}>
-            Monitora una zona in {activeTerritory.name} senza creare un account.
+            {t("alerts.subtitle", {
+              territory: territoryName(activeTerritory),
+            })}
           </Text>
         </View>
 
@@ -302,30 +357,37 @@ export default function AlertsScreen() {
           ]}
         >
           <Text style={[styles.cardTitle, { color: theme.text }]}>
-            Zona monitorata
+            {t("alerts.monitoredArea")}
           </Text>
           {isLoading ? (
             <ActivityIndicator color={theme.accent} />
           ) : watchArea ? (
             <>
               <Text style={[styles.zoneName, { color: theme.text }]}>
-                {watchArea.name}
+                {t("alerts.myPosition", {
+                  territory: territoryName(
+                    getTerritory(watchArea.territoryId) ?? activeTerritory,
+                  ),
+                })}
               </Text>
               <Text style={[styles.coordinates, { color: theme.textMuted }]}>
-                {watchArea.latitude.toFixed(4)}, {watchArea.longitude.toFixed(4)}
+                {formatCoordinate(watchArea.latitude, language)};{" "}
+                {formatCoordinate(watchArea.longitude, language)}
               </Text>
               {watchArea.territoryId !== activeTerritory.id ? (
                 <Text style={[styles.message, { color: theme.warning }]}>
-                  Questa zona appartiene a{" "}
-                  {getTerritory(watchArea.territoryId)?.name ?? "un altro territorio"}.
-                  Se usi la posizione attuale verrà sostituita con una zona in{" "}
-                  {activeTerritory.name}.
+                  {t("alerts.otherTerritory", {
+                    territory: getTerritory(watchArea.territoryId)
+                      ? territoryName(getTerritory(watchArea.territoryId)!)
+                      : t("alerts.otherTerritoryFallback"),
+                    activeTerritory: territoryName(activeTerritory),
+                  })}
                 </Text>
               ) : null}
               <View style={styles.radiusRow}>
                 <CircleButton
                   label="−"
-                  accessibilityLabel="Riduci il raggio"
+                  accessibilityLabel={t("alerts.reduceRadius")}
                   disabled={isSaving}
                   onPress={() => void changeRadius(-5)}
                 />
@@ -336,12 +398,12 @@ export default function AlertsScreen() {
                   <Text
                     style={[styles.radiusLabel, { color: theme.textMuted }]}
                   >
-                    raggio di controllo
+                    {t("alerts.radius")}
                   </Text>
                 </View>
                 <CircleButton
                   label="+"
-                  accessibilityLabel="Aumenta il raggio"
+                  accessibilityLabel={t("alerts.increaseRadius")}
                   disabled={isSaving}
                   onPress={() => void changeRadius(5)}
                 />
@@ -353,17 +415,21 @@ export default function AlertsScreen() {
                   {nearbyCount}
                 </Text>
                 <Text style={[styles.resultText, { color: theme.text }]}>
-                  rilevazioni recenti entro il raggio scelto
+                  {t(
+                    nearbyCount === 1
+                      ? "alerts.nearbyOne"
+                      : "alerts.nearbyCount",
+                  )}
                 </Text>
               </View>
               <View style={styles.buttonRow}>
                 <ActionButton
-                  label="Aggiorna posizione"
+                  label={t("alerts.updatePosition")}
                   onPress={() => void useCurrentPosition()}
                   busy={isLocating}
                 />
                 <ActionButton
-                  label="Rimuovi zona"
+                  label={t("alerts.removeArea")}
                   onPress={() => void clearWatchArea()}
                   secondary
                   disabled={isSaving}
@@ -373,11 +439,10 @@ export default function AlertsScreen() {
           ) : (
             <>
               <Text style={[styles.body, { color: theme.textMuted }]}>
-                La posizione viene richiesta solo quando premi il pulsante. Le
-                notifiche si attivano separatamente.
+                {t("alerts.locationPrivacy")}
               </Text>
               <ActionButton
-                label="Usa la mia posizione"
+                label={t("alerts.usePosition")}
                 onPress={() => void useCurrentPosition()}
                 busy={isLocating}
               />
@@ -404,22 +469,22 @@ export default function AlertsScreen() {
           ]}
         >
           <Text style={[styles.infoTitle, { color: theme.text }]}>
-            {registration ? "Notifiche push attive" : "Notifiche push"}
+            {registration ? t("alerts.pushActive") : t("alerts.push")}
           </Text>
           <Text style={[styles.body, { color: theme.textMuted }]}>
             {registration
-              ? "Il server controlla le nuove rilevazioni satellitari anche quando l'app e chiusa. Gli avvisi sono informativi e non sostituiscono le autorita."
-              : "Attivandole, token del dispositivo, coordinate e raggio vengono conservati dal servizio finche non li cancelli."}
+              ? t("alerts.activeBody")
+              : t("alerts.inactiveBody")}
           </Text>
           {watchArea ? (
             <View style={styles.buttonRow}>
               <ActionButton
                 label={
                   registration
-                    ? "Invia prova"
+                    ? t("alerts.sendTest")
                     : pushAvailable
-                      ? "Attiva notifiche"
-                      : "Servizio non disponibile"
+                      ? t("alerts.enable")
+                      : t("alerts.serviceUnavailable")
                 }
                 onPress={() =>
                   void (registration
@@ -431,7 +496,7 @@ export default function AlertsScreen() {
               />
               {registration ? (
                 <ActionButton
-                  label="Disattiva"
+                  label={t("alerts.disable")}
                   onPress={() => void disableNotifications()}
                   secondary
                   disabled={isSaving}
@@ -444,7 +509,7 @@ export default function AlertsScreen() {
             onPress={() => void Linking.openURL(PRIVACY_URL)}
           >
             <Text style={[styles.privacyLink, { color: theme.accent }]}>
-              Come trattiamo i dati delle notifiche ↗
+              {t("alerts.privacy")}
             </Text>
           </Pressable>
         </View>
@@ -453,10 +518,10 @@ export default function AlertsScreen() {
   );
 }
 
-function errorMessage(error: unknown): string {
+function errorMessage(error: unknown, fallback: string): string {
   return error instanceof Error && error.message
     ? error.message
-    : "Operazione non riuscita. Riprova.";
+    : fallback;
 }
 
 function ActionButton({

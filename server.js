@@ -18,6 +18,13 @@ import { fetchFirmsFires } from "./lib/firms.js";
 import { fetchCloudForecast } from "./lib/cloud.js";
 import { sendExpoPushNotifications } from "./lib/expo-push.js";
 import {
+  localizedMessage,
+  localizedTerritoryName,
+  normalizeLanguage,
+  requestLanguage,
+  SUPPORTED_LANGUAGES,
+} from "./lib/i18n.js";
+import {
   buildOpenMeteoForecastUrl,
   publicOpenMeteoStatus,
 } from "./lib/open-meteo.js";
@@ -106,11 +113,14 @@ app.use(
   }),
 );
 app.use(express.json({ limit: "32kb" }));
-app.use((_request, response, next) => {
+app.use((request, response, next) => {
   response.setHeader(
     "Content-Security-Policy",
     "frame-ancestors 'self' https://sabetta-works.onrender.com https://sabetta-works.area-di-lavo-7588.chatgpt.site",
   );
+  if (request.path.startsWith("/api/")) {
+    response.vary("Accept-Language");
+  }
   next();
 });
 
@@ -124,7 +134,7 @@ function alertMutationRateLimit(request, response, next) {
     response.set("Retry-After", "60");
     return response.status(429).json({
       ok: false,
-      error: "Troppe richieste. Attendi un minuto e riprova.",
+      error: localizedMessage(requestLanguage(request), "rateLimited"),
     });
   }
   current.push(now);
@@ -137,11 +147,25 @@ function bearerSecret(request) {
   return authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
 }
 
-function alertServiceUnavailable(response) {
+function alertServiceUnavailable(request, response) {
   return response.status(503).json({
     ok: false,
-    error: "Il servizio di notifiche non e ancora disponibile.",
+    error: localizedMessage(requestLanguage(request), "alertsUnavailable"),
   });
+}
+
+function apiMessage(request, key, params = {}) {
+  return localizedMessage(requestLanguage(request), key, params);
+}
+
+function localizedPublicTerritory(request, territory, options) {
+  const value = publicTerritory(territory, options);
+  return value
+    ? {
+        ...value,
+        name: localizedTerritoryName(requestLanguage(request), territory),
+      }
+    : value;
 }
 
 function requestedTerritory(request) {
@@ -199,7 +223,7 @@ app.get("/api/territories", (_request, response) => {
   response.json({
     ok: true,
     territories: listTerritories().map((territory) =>
-      publicTerritory(territory),
+      localizedPublicTerritory(_request, territory),
     ),
   });
 });
@@ -209,13 +233,15 @@ app.get("/api/territories/:territoryId", (request, response) => {
   if (!territory) {
     return response.status(404).json({
       ok: false,
-      error: "Territorio non supportato.",
+      error: apiMessage(request, "territoryUnsupported"),
     });
   }
   response.set("Cache-Control", "public, max-age=86400");
   return response.json({
     ok: true,
-    territory: publicTerritory(territory, { includeGeometry: true }),
+    territory: localizedPublicTerritory(request, territory, {
+      includeGeometry: true,
+    }),
   });
 });
 
@@ -223,22 +249,27 @@ app.post(
   "/api/alerts/subscriptions",
   alertMutationRateLimit,
   async (request, response) => {
-    if (!firmsMapKey) return alertServiceUnavailable(response);
+    if (!firmsMapKey) return alertServiceUnavailable(request, response);
     const expoPushToken = String(request.body?.expoPushToken || "").trim();
     const watchArea = parseWatchArea(request.body?.watchArea);
+    const language = normalizeLanguage(request.body?.language);
     if (!isExpoPushToken(expoPushToken) || !watchArea) {
       return response.status(400).json({
         ok: false,
-        error: "Token di notifica o zona monitorata non validi.",
+        error: apiMessage(request, "alertDataInvalid"),
       });
     }
     if (!(await hasWatchAreaEntitlement(request, watchArea))) {
       return response.status(403).json({
         ok: false,
-        error: "Il territorio selezionato non risulta acquistato.",
+        error: apiMessage(request, "territoryLocked"),
       });
     }
-    const created = await alertStore.createSubscription({ expoPushToken, watchArea });
+    const created = await alertStore.createSubscription({
+      expoPushToken,
+      watchArea,
+      language,
+    });
     response.set("Cache-Control", "no-store");
     return response.status(201).json({ ok: true, ...created });
   },
@@ -255,22 +286,37 @@ app.patch(
     const watchArea = request.body?.watchArea
       ? parseWatchArea(request.body.watchArea)
       : null;
-    if (!secret || (expoPushToken && !isExpoPushToken(expoPushToken)) || (!expoPushToken && !watchArea)) {
-      return response.status(400).json({ ok: false, error: "Aggiornamento non valido." });
+    const requestedLanguage = request.body?.language
+      ? String(request.body.language).trim().toLowerCase()
+      : null;
+    const language = requestedLanguage
+      ? normalizeLanguage(requestedLanguage)
+      : null;
+    if (
+      !secret ||
+      (expoPushToken && !isExpoPushToken(expoPushToken)) ||
+      (requestedLanguage && !SUPPORTED_LANGUAGES.includes(requestedLanguage)) ||
+      (!expoPushToken && !watchArea && !language)
+    ) {
+      return response
+        .status(400)
+        .json({ ok: false, error: apiMessage(request, "updateInvalid") });
     }
     if (watchArea && !(await hasWatchAreaEntitlement(request, watchArea))) {
       return response.status(403).json({
         ok: false,
-        error: "Il territorio selezionato non risulta acquistato.",
+        error: apiMessage(request, "territoryLocked"),
       });
     }
     const subscription = await alertStore.updateSubscription(
       request.params.subscriptionId,
       secret,
-      { expoPushToken, watchArea },
+      { expoPushToken, watchArea, language },
     );
     if (!subscription) {
-      return response.status(404).json({ ok: false, error: "Registrazione non trovata." });
+      return response
+        .status(404)
+        .json({ ok: false, error: apiMessage(request, "registrationMissing") });
     }
     response.set("Cache-Control", "no-store");
     return response.json({ ok: true, subscription });
@@ -283,14 +329,18 @@ app.delete(
   async (request, response) => {
     const secret = bearerSecret(request);
     if (!secret) {
-      return response.status(400).json({ ok: false, error: "Autorizzazione mancante." });
+      return response
+        .status(400)
+        .json({ ok: false, error: apiMessage(request, "authorizationMissing") });
     }
     const deleted = await alertStore.deleteSubscription(
       request.params.subscriptionId,
       secret,
     );
     if (!deleted) {
-      return response.status(404).json({ ok: false, error: "Registrazione non trovata." });
+      return response
+        .status(404)
+        .json({ ok: false, error: apiMessage(request, "registrationMissing") });
     }
     return response.status(204).end();
   },
@@ -300,13 +350,15 @@ app.post(
   "/api/alerts/subscriptions/:subscriptionId/test",
   alertMutationRateLimit,
   async (request, response) => {
-    if (!firmsMapKey) return alertServiceUnavailable(response);
+    if (!firmsMapKey) return alertServiceUnavailable(request, response);
     const subscription = await alertStore.getAuthorizedSubscription(
       request.params.subscriptionId,
       bearerSecret(request),
     );
     if (!subscription) {
-      return response.status(404).json({ ok: false, error: "Registrazione non trovata." });
+      return response
+        .status(404)
+        .json({ ok: false, error: apiMessage(request, "registrationMissing") });
     }
     if (
       subscription.lastTestAt &&
@@ -315,7 +367,7 @@ app.post(
       response.set("Retry-After", "60");
       return response.status(429).json({
         ok: false,
-        error: "Attendi un minuto prima di inviare un'altra prova.",
+        error: apiMessage(request, "testRateLimited"),
       });
     }
     const [ticket] = await sendExpoPushNotifications(
@@ -323,8 +375,8 @@ app.post(
         {
           to: subscription.expoPushToken,
           sound: "default",
-          title: "Sabetta Piro — notifiche attive",
-          body: "La zona monitorata e collegata correttamente. Riceverai avvisi per nuove rilevazioni satellitari compatibili.",
+          title: localizedMessage(subscription.language, "testTitle"),
+          body: localizedMessage(subscription.language, "testBody"),
           data: { type: "alert-test" },
           priority: "high",
           ttl: 600,
@@ -338,7 +390,7 @@ app.post(
       }
       return response.status(502).json({
         ok: false,
-        error: "Expo non ha accettato la notifica di prova.",
+        error: apiMessage(request, "testRejected"),
       });
     }
     await alertStore.recordTest(subscription.id, new Date().toISOString());
@@ -352,7 +404,7 @@ app.get("/api/fires", async (request, response) => {
   if (!territory) {
     return response.status(404).json({
       ok: false,
-      error: "Territorio non supportato.",
+      error: apiMessage(request, "territoryUnsupported"),
     });
   }
 
@@ -368,7 +420,7 @@ app.get("/api/fires", async (request, response) => {
       configured: false,
       generatedAt: new Date().toISOString(),
       refreshSeconds: DEFAULT_REFRESH_SECONDS,
-      territory: publicTerritory(territory),
+      territory: localizedPublicTerritory(request, territory),
       fires: [],
       stats: {
         total: 0,
@@ -379,12 +431,11 @@ app.get("/api/fires", async (request, response) => {
         latestObservation: null,
       },
       sourceStatus: [],
-      message:
-        "La mappa EFFIS e i layer di rischio sono attivi. Configura FIRMS_MAP_KEY per punti interattivi, conteggi e notifiche di prossimita.",
+      message: apiMessage(request, "effisOnly"),
     });
   }
 
-  const cacheKey = `fires:${territory.id}:${sourceGroup}:${days}`;
+  const cacheKey = `fires:${territory.id}:${sourceGroup}:${days}:${requestLanguage(request)}`;
   const cached = cache.get(cacheKey);
   if (cached) return response.json({ ...cached, cached: true });
 
@@ -401,7 +452,7 @@ app.get("/api/fires", async (request, response) => {
       configured: true,
       generatedAt: new Date().toISOString(),
       refreshSeconds: DEFAULT_REFRESH_SECONDS,
-      territory: publicTerritory(territory),
+      territory: localizedPublicTerritory(request, territory),
       query: { days, sourceGroup, sources, territoryId: territory.id },
       ...result,
     };
@@ -412,7 +463,7 @@ app.get("/api/fires", async (request, response) => {
     return response.status(502).json({
       ok: false,
       configured: true,
-      error: "Impossibile aggiornare il feed NASA FIRMS in questo momento.",
+      error: apiMessage(request, "firmsUnavailable"),
       details: process.env.NODE_ENV === "development" ? error.message : undefined,
     });
   }
@@ -424,11 +475,15 @@ app.get("/api/weather", async (request, response) => {
   const longitude = Number.parseFloat(String(request.query.lon || ""));
 
   if (!territory || !Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-    return response.status(400).json({ ok: false, error: "Coordinate non valide." });
+    return response
+      .status(400)
+      .json({ ok: false, error: apiMessage(request, "coordinatesInvalid") });
   }
 
   if (!isPointInTerritory(territory, latitude, longitude)) {
-    return response.status(400).json({ ok: false, error: "Coordinate fuori dall'area supportata." });
+    return response
+      .status(400)
+      .json({ ok: false, error: apiMessage(request, "coordinatesOutside") });
   }
 
   const cacheKey = `weather:${territory.id}:${latitude.toFixed(2)}:${longitude.toFixed(2)}`;
@@ -468,7 +523,7 @@ app.get("/api/weather", async (request, response) => {
     console.error("Weather request failed:", error);
     return response.status(502).json({
       ok: false,
-      error: "Meteo locale temporaneamente non disponibile.",
+      error: apiMessage(request, "weatherUnavailable"),
       details: process.env.NODE_ENV === "development" ? error.message : undefined,
     });
   }
@@ -480,7 +535,7 @@ app.get("/api/wind-grid", async (request, response) => {
   if (!territory) {
     return response.status(404).json({
       ok: false,
-      error: "Territorio non supportato.",
+      error: apiMessage(request, "territoryUnsupported"),
     });
   }
   const requestedBounds = {
@@ -494,7 +549,9 @@ app.get("/api/wind-grid", async (request, response) => {
     requestedBounds.north <= requestedBounds.south ||
     requestedBounds.east <= requestedBounds.west
   ) {
-    return response.status(400).json({ ok: false, error: "Limiti della mappa non validi." });
+    return response
+      .status(400)
+      .json({ ok: false, error: apiMessage(request, "boundsInvalid") });
   }
 
   const bounds = {
@@ -544,7 +601,7 @@ app.get("/api/wind-grid", async (request, response) => {
     console.error("Wind grid request failed:", error);
     return response.status(502).json({
       ok: false,
-      error: "Mappa del vento temporaneamente non disponibile.",
+      error: apiMessage(request, "windMapUnavailable"),
       details: process.env.NODE_ENV === "development" ? error.message : undefined,
     });
   }
@@ -556,10 +613,11 @@ app.get("/api/cloud-forecast", async (request, response) => {
   if (!territory) {
     return response.status(404).json({
       ok: false,
-      error: "Territorio non supportato.",
+      error: apiMessage(request, "territoryUnsupported"),
     });
   }
-  const cacheKey = `cloud-forecast:${territory.id}:5x5:25h`;
+  const language = requestLanguage(request);
+  const cacheKey = `cloud-forecast:${territory.id}:5x5:25h:${language}`;
   const cached = cache.get(cacheKey);
   if (cached) return response.json({ ...cached, cached: true });
 
@@ -574,8 +632,7 @@ app.get("/api/cloud-forecast", async (request, response) => {
         generatedAt: new Date().toISOString(),
         source: "Open-Meteo",
         sourceMode: weatherService.mode,
-        methodology:
-          "Copertura nuvolosa oraria modellata; non e un'immagine satellitare osservata.",
+        methodology: apiMessage(request, "cloudMethodology"),
         bounds: territory.queryBounds,
         frames: [],
       });
@@ -586,7 +643,7 @@ app.get("/api/cloud-forecast", async (request, response) => {
       generatedAt: new Date().toISOString(),
       source: "Open-Meteo",
       sourceMode: weatherService.mode,
-      methodology: "Copertura nuvolosa oraria modellata; non e un'immagine satellitare osservata.",
+      methodology: apiMessage(request, "cloudMethodology"),
       bounds: territory.queryBounds,
       frames,
     };
@@ -596,7 +653,7 @@ app.get("/api/cloud-forecast", async (request, response) => {
     console.error("Cloud forecast request failed:", error);
     return response.status(502).json({
       ok: false,
-      error: "Previsione della nuvolosita temporaneamente non disponibile.",
+      error: apiMessage(request, "cloudsUnavailable"),
       details: process.env.NODE_ENV === "development" ? error.message : undefined,
     });
   }
@@ -615,11 +672,15 @@ app.get("/api/wind-history", async (request, response) => {
     !Number.isFinite(longitude) ||
     Number.isNaN(new Date(startAt).getTime())
   ) {
-    return response.status(400).json({ ok: false, error: "Coordinate o data iniziale non valide." });
+    return response
+      .status(400)
+      .json({ ok: false, error: apiMessage(request, "windRequestInvalid") });
   }
 
   if (!isPointInTerritory(territory, latitude, longitude)) {
-    return response.status(400).json({ ok: false, error: "Coordinate fuori dall'area supportata." });
+    return response
+      .status(400)
+      .json({ ok: false, error: apiMessage(request, "coordinatesOutside") });
   }
 
   const cacheKey = `wind:${territory.id}:${latitude.toFixed(2)}:${longitude.toFixed(2)}:${startAt.slice(0, 13)}`;
@@ -640,7 +701,7 @@ app.get("/api/wind-history", async (request, response) => {
     console.error("Wind history request failed:", error);
     return response.status(502).json({
       ok: false,
-      error: "Storico del vento temporaneamente non disponibile.",
+      error: apiMessage(request, "windHistoryUnavailable"),
       details: process.env.NODE_ENV === "development" ? error.message : undefined,
     });
   }

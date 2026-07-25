@@ -3,25 +3,33 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { EventCard } from "../../src/components/EventCard";
 import { useFireData } from "../../src/context/fire-data";
 import { useTerritory } from "../../src/context/territory";
+import { useI18n } from "../../src/i18n";
 import { spacing, useAppTheme } from "../../src/theme";
 
 export default function EventsScreen() {
   const theme = useAppTheme();
+  const { t, territoryName } = useI18n();
   const { activeTerritory } = useTerritory();
   const { feed, fires, isLoading, isRefreshing, error, refresh } = useFireData();
 
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: theme.background }]} edges={["top"]}>
       <View style={styles.header}>
-        <Text style={[styles.title, { color: theme.text }]}>Rilevazioni</Text>
+        <Text style={[styles.title, { color: theme.text }]}>
+          {t("events.title")}
+        </Text>
         <Text style={[styles.subtitle, { color: theme.textMuted }]}>
-          {activeTerritory.name} · anomalie termiche satellitari, dalla più recente.
+          {t("events.subtitle", {
+            territory: territoryName(activeTerritory),
+          })}
         </Text>
       </View>
       {isLoading ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color={theme.accent} />
-          <Text style={[styles.stateTitle, { color: theme.text }]}>Caricamento delle rilevazioni</Text>
+          <Text style={[styles.stateTitle, { color: theme.text }]}>
+            {t("events.loading")}
+          </Text>
         </View>
       ) : (
         <FlatList
@@ -38,15 +46,22 @@ export default function EventsScreen() {
                 <Text style={[styles.error, { color: theme.danger }]}>{error}</Text>
               ) : null}
               <View style={[styles.counter, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-                <Counter label="Nel periodo" value={feed?.stats.total ?? 0} />
-                <Counter label="Alta affidabilita" value={feed?.stats.highConfidence ?? 0} />
+                <Counter label={t("events.inPeriod")} value={feed?.stats.total ?? 0} />
+                <Counter
+                  label={t("events.highConfidence")}
+                  value={feed?.stats.highConfidence ?? 0}
+                />
               </View>
             </View>
           }
           ListEmptyComponent={
             <View style={[styles.empty, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-              <Text style={[styles.stateTitle, { color: theme.text }]}>Nessuna rilevazione disponibile</Text>
-              <Text style={[styles.stateText, { color: theme.textMuted }]}>Il feed potrebbe non essere configurato oppure non avere osservazioni recenti.</Text>
+              <Text style={[styles.stateTitle, { color: theme.text }]}>
+                {t("events.emptyTitle")}
+              </Text>
+              <Text style={[styles.stateText, { color: theme.textMuted }]}>
+                {t("events.emptyBody")}
+              </Text>
             </View>
           }
         />

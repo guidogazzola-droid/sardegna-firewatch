@@ -1,0 +1,9 @@
+{
+  "ios": {
+    "CFBundleDisplayName": "Sabetta Piro",
+    "NSLocationWhenInUseUsageDescription": "Sabetta Piro usa la tua posizione solo mentre usi l’app, per mostrarti le rilevazioni vicine e creare zone monitorate."
+  },
+  "android": {
+    "app_name": "Sabetta Piro"
+  }
+}
