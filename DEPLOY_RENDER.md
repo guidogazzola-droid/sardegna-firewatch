@@ -26,6 +26,21 @@ Conservala come segreto: non inserirla nel codice o nel repository.
 
 Il file usa `plan: starter`, adatto a un servizio sempre disponibile. Per una sola prova puoi cambiare temporaneamente la riga in `plan: free`; il servizio gratuito puo sospendersi dopo un periodo senza traffico.
 
+### Persistenza necessaria per le notifiche iOS
+
+Le registrazioni push non devono essere affidate al filesystem temporaneo del
+servizio. Prima di abilitare le notifiche in una build pubblica:
+
+1. aggiungi un disco persistente Render montato in `/var/data`;
+2. configura `ALERT_STORE_PATH=/var/data/alerts.json`;
+3. mantieni una sola istanza del servizio web;
+4. verifica in `/api/status` che `alerts.persistentStorageConfigured` sia
+   `true`.
+
+Il codice funziona anche senza disco per test locali, ma un riavvio o un deploy
+cancellerebbe le registrazioni. L'attivazione del disco e quindi un requisito di
+rilascio, non un miglioramento facoltativo.
+
 ## 4. Verificare il deploy
 
 Sostituisci `TUO-SERVIZIO.onrender.com` con il dominio assegnato:

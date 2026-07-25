@@ -163,6 +163,11 @@ export interface SystemStatusResponse {
   refreshSeconds: number;
   bbox: GeoBounds;
   weatherService?: WeatherServiceStatus;
+  alerts?: {
+    available: boolean;
+    checkIntervalSeconds: number;
+    persistentStorageConfigured: boolean;
+  };
   sources: {
     effis: boolean;
     firms: boolean;
@@ -170,6 +175,7 @@ export interface SystemStatusResponse {
     windMap: boolean;
     windHistory: boolean;
     cloudForecast: boolean;
+    alerts?: boolean;
   };
 }
 
@@ -181,4 +187,29 @@ export interface WatchArea {
   radiusKm: number;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface AlertSubscription {
+  id: string;
+  watchArea: WatchArea;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+  lastNotificationAt: string | null;
+}
+
+export interface StoredAlertRegistration {
+  id: string;
+  secret: string;
+}
+
+export interface CreateAlertSubscriptionResponse {
+  ok: true;
+  subscription: AlertSubscription;
+  secret: string;
+}
+
+export interface UpdateAlertSubscriptionResponse {
+  ok: true;
+  subscription: AlertSubscription;
 }

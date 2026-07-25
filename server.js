@@ -4,6 +4,9 @@ import compression from "compression";
 import dotenv from "dotenv";
 import express from "express";
 import helmet from "helmet";
+import { AlertMonitor } from "./lib/alert-monitor.js";
+import { AlertStore } from "./lib/alert-store.js";
+import { isExpoPushToken, parseWatchArea } from "./lib/alerts.js";
 import { TtlCache } from "./lib/cache.js";
 import {
   DEFAULT_CACHE_TTL_MS,
@@ -13,6 +16,7 @@ import {
 } from "./lib/config.js";
 import { fetchFirmsFires } from "./lib/firms.js";
 import { fetchCloudForecast } from "./lib/cloud.js";
+import { sendExpoPushNotifications } from "./lib/expo-push.js";
 import {
   buildOpenMeteoForecastUrl,
   publicOpenMeteoStatus,
@@ -35,6 +39,29 @@ const cacheTtlMs = Number.parseInt(process.env.CACHE_TTL_MS || String(DEFAULT_CA
 const firmsMapKey = String(process.env.FIRMS_MAP_KEY || "").trim();
 const weatherService = publicOpenMeteoStatus();
 const weatherConfigured = !weatherService.commercialRequired || weatherService.commercialReady;
+const alertStorePath =
+  process.env.ALERT_STORE_PATH || path.join(__dirname, ".data", "alerts.json");
+const expoAccessToken = String(process.env.EXPO_ACCESS_TOKEN || "").trim();
+const alertMonitorIntervalMs = Math.max(
+  60_000,
+  Number.parseInt(process.env.ALERT_MONITOR_INTERVAL_MS || "300000", 10) || 300_000,
+);
+const alertStore = new AlertStore({ filePath: alertStorePath });
+const alertMonitor = new AlertMonitor({
+  store: alertStore,
+  accessToken: expoAccessToken,
+  intervalMs: alertMonitorIntervalMs,
+  fetchFires: async () => {
+    if (!firmsMapKey) return [];
+    const result = await fetchFirmsFires({
+      mapKey: firmsMapKey,
+      sources: FIRMS_SOURCES.viirs,
+      days: 1,
+    });
+    return result.fires;
+  },
+});
+const alertMutationWindows = new Map();
 
 app.disable("x-powered-by");
 app.set("trust proxy", 1);
@@ -56,6 +83,36 @@ app.use((_request, response, next) => {
   next();
 });
 
+function alertMutationRateLimit(request, response, next) {
+  const now = Date.now();
+  const key = request.ip || "unknown";
+  const current = (alertMutationWindows.get(key) || []).filter(
+    (timestamp) => now - timestamp < 60_000,
+  );
+  if (current.length >= 20) {
+    response.set("Retry-After", "60");
+    return response.status(429).json({
+      ok: false,
+      error: "Troppe richieste. Attendi un minuto e riprova.",
+    });
+  }
+  current.push(now);
+  alertMutationWindows.set(key, current);
+  return next();
+}
+
+function bearerSecret(request) {
+  const authorization = String(request.get("authorization") || "");
+  return authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
+}
+
+function alertServiceUnavailable(response) {
+  return response.status(503).json({
+    ok: false,
+    error: "Il servizio di notifiche non e ancora disponibile.",
+  });
+}
+
 app.get("/api/health", (_request, response) => {
   response.json({ ok: true, now: new Date().toISOString() });
 });
@@ -69,6 +126,11 @@ app.get("/api/status", (_request, response) => {
     refreshSeconds: DEFAULT_REFRESH_SECONDS,
     bbox: SARDINIA_BBOX,
     weatherService,
+    alerts: {
+      available: Boolean(firmsMapKey),
+      checkIntervalSeconds: Math.round(alertMonitorIntervalMs / 1000),
+      persistentStorageConfigured: Boolean(process.env.ALERT_STORE_PATH),
+    },
     sources: {
       effis: true,
       firms: Boolean(firmsMapKey),
@@ -76,9 +138,125 @@ app.get("/api/status", (_request, response) => {
       windMap: weatherConfigured,
       windHistory: weatherConfigured,
       cloudForecast: weatherConfigured,
+      alerts: Boolean(firmsMapKey),
     },
   });
 });
+
+app.post(
+  "/api/alerts/subscriptions",
+  alertMutationRateLimit,
+  async (request, response) => {
+    if (!firmsMapKey) return alertServiceUnavailable(response);
+    const expoPushToken = String(request.body?.expoPushToken || "").trim();
+    const watchArea = parseWatchArea(request.body?.watchArea);
+    if (!isExpoPushToken(expoPushToken) || !watchArea) {
+      return response.status(400).json({
+        ok: false,
+        error: "Token di notifica o zona monitorata non validi.",
+      });
+    }
+    const created = await alertStore.createSubscription({ expoPushToken, watchArea });
+    response.set("Cache-Control", "no-store");
+    return response.status(201).json({ ok: true, ...created });
+  },
+);
+
+app.patch(
+  "/api/alerts/subscriptions/:subscriptionId",
+  alertMutationRateLimit,
+  async (request, response) => {
+    const secret = bearerSecret(request);
+    const expoPushToken = request.body?.expoPushToken
+      ? String(request.body.expoPushToken).trim()
+      : null;
+    const watchArea = request.body?.watchArea
+      ? parseWatchArea(request.body.watchArea)
+      : null;
+    if (!secret || (expoPushToken && !isExpoPushToken(expoPushToken)) || (!expoPushToken && !watchArea)) {
+      return response.status(400).json({ ok: false, error: "Aggiornamento non valido." });
+    }
+    const subscription = await alertStore.updateSubscription(
+      request.params.subscriptionId,
+      secret,
+      { expoPushToken, watchArea },
+    );
+    if (!subscription) {
+      return response.status(404).json({ ok: false, error: "Registrazione non trovata." });
+    }
+    response.set("Cache-Control", "no-store");
+    return response.json({ ok: true, subscription });
+  },
+);
+
+app.delete(
+  "/api/alerts/subscriptions/:subscriptionId",
+  alertMutationRateLimit,
+  async (request, response) => {
+    const secret = bearerSecret(request);
+    if (!secret) {
+      return response.status(400).json({ ok: false, error: "Autorizzazione mancante." });
+    }
+    const deleted = await alertStore.deleteSubscription(
+      request.params.subscriptionId,
+      secret,
+    );
+    if (!deleted) {
+      return response.status(404).json({ ok: false, error: "Registrazione non trovata." });
+    }
+    return response.status(204).end();
+  },
+);
+
+app.post(
+  "/api/alerts/subscriptions/:subscriptionId/test",
+  alertMutationRateLimit,
+  async (request, response) => {
+    if (!firmsMapKey) return alertServiceUnavailable(response);
+    const subscription = await alertStore.getAuthorizedSubscription(
+      request.params.subscriptionId,
+      bearerSecret(request),
+    );
+    if (!subscription) {
+      return response.status(404).json({ ok: false, error: "Registrazione non trovata." });
+    }
+    if (
+      subscription.lastTestAt &&
+      Date.now() - new Date(subscription.lastTestAt).getTime() < 60_000
+    ) {
+      response.set("Retry-After", "60");
+      return response.status(429).json({
+        ok: false,
+        error: "Attendi un minuto prima di inviare un'altra prova.",
+      });
+    }
+    const [ticket] = await sendExpoPushNotifications(
+      [
+        {
+          to: subscription.expoPushToken,
+          sound: "default",
+          title: "Sabetta Piro — notifiche attive",
+          body: "La zona monitorata e collegata correttamente. Riceverai avvisi per nuove rilevazioni satellitari compatibili.",
+          data: { type: "alert-test" },
+          priority: "high",
+          ttl: 600,
+        },
+      ],
+      { accessToken: expoAccessToken },
+    );
+    if (ticket?.status !== "ok") {
+      if (ticket?.details?.error === "DeviceNotRegistered") {
+        await alertStore.deactivateSubscription(subscription.id);
+      }
+      return response.status(502).json({
+        ok: false,
+        error: "Expo non ha accettato la notifica di prova.",
+      });
+    }
+    await alertStore.recordTest(subscription.id, new Date().toISOString());
+    return response.json({ ok: true });
+  },
+);
 
 app.get("/api/fires", async (request, response) => {
   response.set("Cache-Control", "no-store");
@@ -343,8 +521,37 @@ app.get("/{*splat}", (_request, response) => {
   response.sendFile(path.join(publicDir, "index.html"));
 });
 
-app.listen(port, "0.0.0.0", () => {
-  console.log(`Sardegna FireWatch disponibile su http://localhost:${port}`);
-  console.log(`Modalita feed: ${firmsMapKey ? "EFFIS + NASA FIRMS" : "EFFIS (FIRMS_MAP_KEY non configurata)"}`);
-  console.log(`Modalita meteo: ${weatherService.mode}${weatherConfigured ? "" : " (configurazione commerciale mancante)"}`);
+async function startServer() {
+  await alertStore.initialize();
+  const server = app.listen(port, "0.0.0.0", () => {
+    console.log(`Sardegna FireWatch disponibile su http://localhost:${port}`);
+    console.log(
+      `Modalita feed: ${
+        firmsMapKey ? "EFFIS + NASA FIRMS" : "EFFIS (FIRMS_MAP_KEY non configurata)"
+      }`,
+    );
+    console.log(
+      `Modalita meteo: ${weatherService.mode}${
+        weatherConfigured ? "" : " (configurazione commerciale mancante)"
+      }`,
+    );
+    console.log(
+      `Notifiche: ${
+        firmsMapKey ? `controllo ogni ${Math.round(alertMonitorIntervalMs / 1000)}s` : "non attive"
+      }`,
+    );
+  });
+  alertMonitor.start();
+
+  const stop = () => {
+    alertMonitor.stop();
+    server.close(() => process.exit(0));
+  };
+  process.once("SIGTERM", stop);
+  process.once("SIGINT", stop);
+}
+
+startServer().catch((error) => {
+  console.error("Avvio server fallito:", error);
+  process.exitCode = 1;
 });

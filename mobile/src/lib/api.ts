@@ -1,9 +1,12 @@
 import { API_BASE_URL } from "./config";
 import type {
   CloudForecastResponse,
+  CreateAlertSubscriptionResponse,
   FireFeedResponse,
   GeoBounds,
   SystemStatusResponse,
+  UpdateAlertSubscriptionResponse,
+  WatchArea,
   WindGridResponse,
   WindHistoryResponse,
 } from "./types";
@@ -51,6 +54,43 @@ async function requestJson<T>(path: string, signal?: AbortSignal): Promise<T> {
     throw new ApiError(message, response.status);
   }
 
+  return payload as T;
+}
+
+async function mutationJson<T>(
+  path: string,
+  options: {
+    method: "POST" | "PATCH" | "DELETE";
+    body?: object;
+    secret?: string;
+  },
+): Promise<T> {
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      method: options.method,
+      headers: {
+        Accept: "application/json",
+        ...(options.body ? { "Content-Type": "application/json" } : {}),
+        ...(options.secret ? { Authorization: `Bearer ${options.secret}` } : {}),
+      },
+      ...(options.body ? { body: JSON.stringify(options.body) } : {}),
+    });
+  } catch {
+    throw new ApiError("Impossibile raggiungere il servizio notifiche.");
+  }
+
+  if (response.status === 204) return undefined as T;
+
+  const payload = (await response.json().catch(() => null)) as
+    | { error?: string }
+    | null;
+  if (!response.ok) {
+    throw new ApiError(
+      payload?.error || "Il servizio notifiche non e temporaneamente disponibile.",
+      response.status,
+    );
+  }
   return payload as T;
 }
 
@@ -116,4 +156,59 @@ export function fetchWindHistory(
   });
 
   return requestJson<WindHistoryResponse>(`/api/wind-history?${query.toString()}`, options.signal);
+}
+
+export function createAlertSubscription(options: {
+  expoPushToken: string;
+  watchArea: WatchArea;
+}): Promise<CreateAlertSubscriptionResponse> {
+  return mutationJson<CreateAlertSubscriptionResponse>("/api/alerts/subscriptions", {
+    method: "POST",
+    body: options,
+  });
+}
+
+export function updateAlertSubscription(options: {
+  id: string;
+  secret: string;
+  expoPushToken?: string;
+  watchArea?: WatchArea;
+}): Promise<UpdateAlertSubscriptionResponse> {
+  return mutationJson<UpdateAlertSubscriptionResponse>(
+    `/api/alerts/subscriptions/${encodeURIComponent(options.id)}`,
+    {
+      method: "PATCH",
+      secret: options.secret,
+      body: {
+        ...(options.expoPushToken ? { expoPushToken: options.expoPushToken } : {}),
+        ...(options.watchArea ? { watchArea: options.watchArea } : {}),
+      },
+    },
+  );
+}
+
+export function deleteAlertSubscription(options: {
+  id: string;
+  secret: string;
+}): Promise<void> {
+  return mutationJson<void>(
+    `/api/alerts/subscriptions/${encodeURIComponent(options.id)}`,
+    {
+      method: "DELETE",
+      secret: options.secret,
+    },
+  );
+}
+
+export function sendAlertTest(options: {
+  id: string;
+  secret: string;
+}): Promise<{ ok: true }> {
+  return mutationJson<{ ok: true }>(
+    `/api/alerts/subscriptions/${encodeURIComponent(options.id)}/test`,
+    {
+      method: "POST",
+      secret: options.secret,
+    },
+  );
 }

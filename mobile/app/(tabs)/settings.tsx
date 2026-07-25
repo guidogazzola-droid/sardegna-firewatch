@@ -1,7 +1,13 @@
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFireData } from "../../src/context/fire-data";
-import { API_BASE_URL, APP_DISPLAY_NAME, APP_VERSION } from "../../src/lib/config";
+import {
+  API_BASE_URL,
+  APP_DISPLAY_NAME,
+  APP_VERSION,
+  PRIVACY_URL,
+  SUPPORT_URL,
+} from "../../src/lib/config";
 import { spacing, useAppTheme } from "../../src/theme";
 
 export default function SettingsScreen() {
@@ -22,6 +28,7 @@ export default function SettingsScreen() {
           <InfoRow label="Copernicus EFFIS" enabled={status?.sources.effis ?? true} />
           <InfoRow label="Vento Open-Meteo" enabled={status?.sources.windMap ?? false} />
           <InfoRow label="Nuvolosita Open-Meteo" enabled={status?.sources.cloudForecast ?? false} />
+          <InfoRow label="Notifiche di prossimita" enabled={status?.alerts?.available ?? false} />
           <Text style={[styles.meta, { color: theme.textMuted }]}>Aggiornamento previsto ogni {status?.refreshSeconds ?? 300} secondi.</Text>
         </Section>
 
@@ -68,12 +75,21 @@ export default function SettingsScreen() {
           <ExternalLink label="Bollettino Regione Sardegna" url="https://www.sardegnaambiente.it/index.php?c=7093&s=20&v=9&xsl=2273" />
         </Section>
 
+        <Section title="Privacy e assistenza">
+          <ExternalLink label="Informativa privacy" url={PRIVACY_URL} />
+          <ExternalLink label="Supporto Sabetta Piro" url={SUPPORT_URL} />
+        </Section>
+
         <Section title="Versione tecnica">
           <MetaRow label="Nome pubblico" value={APP_DISPLAY_NAME} />
           <MetaRow label="App" value={APP_VERSION} />
           <MetaRow label="Bundle ID" value="com.guidogazzola.sardiniafirewatch" />
           <MetaRow label="Backend" value={API_BASE_URL} />
-          <Text style={[styles.meta, { color: theme.textMuted }]}>Le preferenze della zona monitorata restano sul dispositivo; in questa fase non e richiesto alcun account.</Text>
+          <Text style={[styles.meta, { color: theme.textMuted }]}>
+            Non e richiesto alcun account. Se attivi le notifiche, token push,
+            coordinate e raggio vengono conservati dal servizio fino alla
+            disattivazione.
+          </Text>
         </Section>
       </ScrollView>
     </SafeAreaView>
