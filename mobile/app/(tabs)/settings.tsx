@@ -1,6 +1,7 @@
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFireData } from "../../src/context/fire-data";
+import { useTerritory } from "../../src/context/territory";
 import {
   API_BASE_URL,
   APP_DISPLAY_NAME,
@@ -12,6 +13,7 @@ import { spacing, useAppTheme } from "../../src/theme";
 
 export default function SettingsScreen() {
   const theme = useAppTheme();
+  const { activeTerritory, unlockedTerritoryIds } = useTerritory();
   const { status } = useFireData();
   const weatherCommercial = status?.weatherService?.commercialReady === true;
 
@@ -24,6 +26,11 @@ export default function SettingsScreen() {
         </View>
 
         <Section title="Stato del servizio">
+          <MetaRow label="Territorio attivo" value={activeTerritory.name} />
+          <MetaRow
+            label="Territori disponibili"
+            value={`${status?.territories?.available ?? 48} · ${unlockedTerritoryIds.size} sbloccati`}
+          />
           <InfoRow label="NASA FIRMS" enabled={status?.sources.firms ?? false} />
           <InfoRow label="Copernicus EFFIS" enabled={status?.sources.effis ?? true} />
           <InfoRow label="Vento Open-Meteo" enabled={status?.sources.windMap ?? false} />
@@ -78,6 +85,17 @@ export default function SettingsScreen() {
         <Section title="Privacy e assistenza">
           <ExternalLink label="Informativa privacy" url={PRIVACY_URL} />
           <ExternalLink label="Supporto Sabetta Piro" url={SUPPORT_URL} />
+        </Section>
+
+        <Section title="Acquisti nell'app">
+          <Text style={[styles.body, { color: theme.text }]}>
+            La Sardegna è gratuita. Ogni Paese aggiuntivo è un acquisto
+            non consumabile separato, senza abbonamento.
+          </Text>
+          <Text style={[styles.meta, { color: theme.textMuted }]}>
+            Gli acquisti sono gestiti da Apple e possono essere ripristinati
+            dalla sezione Paesi.
+          </Text>
         </Section>
 
         <Section title="Versione tecnica">

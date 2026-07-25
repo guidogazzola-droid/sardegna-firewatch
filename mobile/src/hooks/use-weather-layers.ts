@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchCloudForecast, fetchWindGrid } from "../lib/api";
-import { SARDINIA_BOUNDS } from "../lib/config";
+import type { Territory } from "../lib/territories";
 import type { CloudFrame, GeoBounds, WindSample } from "../lib/types";
 
 function readableError(error: unknown, fallback: string): string {
@@ -25,7 +25,7 @@ export interface WeatherLayersState {
   stopCloudPlayback: () => void;
 }
 
-export function useWeatherLayers(): WeatherLayersState {
+export function useWeatherLayers(territory: Territory): WeatherLayersState {
   const [windSamples, setWindSamples] = useState<WindSample[]>([]);
   const [cloudFrames, setCloudFrames] = useState<CloudFrame[]>([]);
   const [cloudFrameIndex, setCloudFrameIndexState] = useState(0);
@@ -37,7 +37,7 @@ export function useWeatherLayers(): WeatherLayersState {
   const windController = useRef<AbortController | null>(null);
   const cloudController = useRef<AbortController | null>(null);
 
-  const loadWind = useCallback(async (bounds: GeoBounds = SARDINIA_BOUNDS) => {
+  const loadWind = useCallback(async (bounds: GeoBounds = territory.queryBounds) => {
     windController.current?.abort();
     const controller = new AbortController();
     windController.current = controller;
@@ -46,6 +46,7 @@ export function useWeatherLayers(): WeatherLayersState {
     try {
       const payload = await fetchWindGrid({
         bounds,
+        territoryId: territory.id,
         rows: 4,
         columns: 5,
         signal: controller.signal,
@@ -60,7 +61,7 @@ export function useWeatherLayers(): WeatherLayersState {
     } finally {
       if (windController.current === controller) setIsWindLoading(false);
     }
-  }, []);
+  }, [territory.id, territory.queryBounds]);
 
   const loadClouds = useCallback(
     async ({ preserveFrame = false }: { preserveFrame?: boolean } = {}) => {
@@ -70,7 +71,10 @@ export function useWeatherLayers(): WeatherLayersState {
       setIsCloudLoading(true);
 
       try {
-        const payload = await fetchCloudForecast(controller.signal);
+        const payload = await fetchCloudForecast(
+          territory.id,
+          controller.signal,
+        );
         if (cloudController.current !== controller) return;
         const nextFrames = Array.isArray(payload.frames) ? payload.frames : [];
         setCloudFrames(nextFrames);
@@ -87,7 +91,7 @@ export function useWeatherLayers(): WeatherLayersState {
         if (cloudController.current === controller) setIsCloudLoading(false);
       }
     },
-    [],
+    [territory.id],
   );
 
   const setCloudFrameIndex = useCallback(
@@ -109,13 +113,16 @@ export function useWeatherLayers(): WeatherLayersState {
   const stopCloudPlayback = useCallback(() => setIsCloudPlaying(false), []);
 
   useEffect(() => {
+    setWindSamples([]);
+    setCloudFrames([]);
+    setCloudFrameIndexState(0);
     void loadWind();
     void loadClouds();
     return () => {
       windController.current?.abort();
       cloudController.current?.abort();
     };
-  }, [loadClouds, loadWind]);
+  }, [loadClouds, loadWind, territory.id]);
 
   useEffect(() => {
     if (!isCloudPlaying || cloudFrames.length < 2) return undefined;

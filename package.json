@@ -3,21 +3,27 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Dashboard cartografica per il monitoraggio quasi in tempo reale degli incendi in Sardegna.",
+  "description": "Sabetta Piro: mappe, dati e avvisi quasi in tempo reale sugli incendi in Sardegna e nei territori europei.",
   "engines": {
     "node": ">=24.0.0 <25.0.0"
   },
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "test": "node --test"
+    "test": "node --test",
+    "generate:territories": "node scripts/generate-territories.mjs"
   },
   "dependencies": {
+    "@apple/app-store-server-library": "^3.1.0",
     "compression": "^1.8.1",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
     "helmet": "^8.1.0",
     "leaflet": "^1.9.4",
     "leaflet.markercluster": "^1.5.3"
+  },
+  "devDependencies": {
+    "topojson-client": "^3.1.0",
+    "world-atlas": "^2.0.2"
   }
 }

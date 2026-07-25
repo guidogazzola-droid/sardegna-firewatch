@@ -2,17 +2,21 @@ import { ActivityIndicator, FlatList, StyleSheet, Text, View } from "react-nativ
 import { SafeAreaView } from "react-native-safe-area-context";
 import { EventCard } from "../../src/components/EventCard";
 import { useFireData } from "../../src/context/fire-data";
+import { useTerritory } from "../../src/context/territory";
 import { spacing, useAppTheme } from "../../src/theme";
 
 export default function EventsScreen() {
   const theme = useAppTheme();
+  const { activeTerritory } = useTerritory();
   const { feed, fires, isLoading, isRefreshing, error, refresh } = useFireData();
 
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: theme.background }]} edges={["top"]}>
       <View style={styles.header}>
         <Text style={[styles.title, { color: theme.text }]}>Rilevazioni</Text>
-        <Text style={[styles.subtitle, { color: theme.textMuted }]}>Anomalie termiche satellitari, dalla piu recente.</Text>
+        <Text style={[styles.subtitle, { color: theme.textMuted }]}>
+          {activeTerritory.name} · anomalie termiche satellitari, dalla più recente.
+        </Text>
       </View>
       {isLoading ? (
         <View style={styles.center}>

@@ -44,6 +44,13 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="territories"
+        options={{
+          title: "Paesi",
+          tabBarIcon: ({ color }) => <TabIcon symbol="◇" color={color} />,
+        }}
+      />
+      <Tabs.Screen
         name="settings"
         options={{
           title: "Info",
