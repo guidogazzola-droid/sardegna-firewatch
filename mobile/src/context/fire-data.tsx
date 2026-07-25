@@ -12,6 +12,7 @@ import { DEFAULT_REFRESH_SECONDS } from "../lib/config";
 import { fetchFireFeed, fetchSystemStatus } from "../lib/api";
 import type { FireDetection, FireFeedResponse, SystemStatusResponse } from "../lib/types";
 import { useTerritory } from "./territory";
+import { translate } from "../i18n";
 
 interface RefreshOptions {
   initial?: boolean;
@@ -33,7 +34,7 @@ const FireDataContext = createContext<FireDataContextValue | null>(null);
 
 function errorMessage(error: unknown): string {
   if (error instanceof Error && error.message) return error.message;
-  return "Aggiornamento non riuscito. Riprova tra poco.";
+  return translate("errors.refreshFailed");
 }
 
 export function FireDataProvider({ children }: { children: ReactNode }) {

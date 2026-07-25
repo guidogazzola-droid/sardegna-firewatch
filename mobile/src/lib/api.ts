@@ -1,4 +1,9 @@
 import { API_BASE_URL } from "./config";
+import {
+  currentLocale,
+  translate,
+  type AppLanguage,
+} from "../i18n";
 import type {
   CloudForecastResponse,
   CreateAlertSubscriptionResponse,
@@ -28,19 +33,22 @@ async function requestJson<T>(path: string, signal?: AbortSignal): Promise<T> {
 
   try {
     response = await fetch(`${API_BASE_URL}${path}`, {
-      headers: { Accept: "application/json" },
+      headers: {
+        Accept: "application/json",
+        "Accept-Language": currentLocale(),
+      },
       signal,
     });
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") throw error;
-    throw new ApiError("Impossibile raggiungere Sardinia FireWatch. Controlla la connessione e riprova.");
+    throw new ApiError(translate("errors.unreachableApp"));
   }
 
   let payload: unknown;
   try {
     payload = await response.json();
   } catch {
-    throw new ApiError("Il servizio ha restituito una risposta non valida.", response.status);
+    throw new ApiError(translate("errors.invalidResponse"), response.status);
   }
 
   if (!response.ok) {
@@ -50,7 +58,7 @@ async function requestJson<T>(path: string, signal?: AbortSignal): Promise<T> {
       "error" in payload &&
       typeof payload.error === "string"
         ? payload.error
-        : "Il servizio non e temporaneamente disponibile.";
+        : translate("errors.serviceUnavailable");
     throw new ApiError(message, response.status);
   }
 
@@ -71,13 +79,14 @@ async function mutationJson<T>(
       method: options.method,
       headers: {
         Accept: "application/json",
+        "Accept-Language": currentLocale(),
         ...(options.body ? { "Content-Type": "application/json" } : {}),
         ...(options.secret ? { Authorization: `Bearer ${options.secret}` } : {}),
       },
       ...(options.body ? { body: JSON.stringify(options.body) } : {}),
     });
   } catch {
-    throw new ApiError("Impossibile raggiungere il servizio notifiche.");
+    throw new ApiError(translate("errors.notificationsUnreachable"));
   }
 
   if (response.status === 204) return undefined as T;
@@ -87,7 +96,7 @@ async function mutationJson<T>(
     | null;
   if (!response.ok) {
     throw new ApiError(
-      payload?.error || "Il servizio notifiche non e temporaneamente disponibile.",
+      payload?.error || translate("errors.notificationsUnavailable"),
       response.status,
     );
   }
@@ -174,6 +183,7 @@ export function fetchWindHistory(
 export function createAlertSubscription(options: {
   expoPushToken: string;
   watchArea: WatchArea;
+  language: AppLanguage;
   entitlementToken?: string | null;
 }): Promise<CreateAlertSubscriptionResponse> {
   return mutationJson<CreateAlertSubscriptionResponse>("/api/alerts/subscriptions", {
@@ -187,6 +197,7 @@ export function updateAlertSubscription(options: {
   secret: string;
   expoPushToken?: string;
   watchArea?: WatchArea;
+  language?: AppLanguage;
   entitlementToken?: string | null;
 }): Promise<UpdateAlertSubscriptionResponse> {
   return mutationJson<UpdateAlertSubscriptionResponse>(
@@ -197,6 +208,7 @@ export function updateAlertSubscription(options: {
       body: {
         ...(options.expoPushToken ? { expoPushToken: options.expoPushToken } : {}),
         ...(options.watchArea ? { watchArea: options.watchArea } : {}),
+        ...(options.language ? { language: options.language } : {}),
         ...(options.entitlementToken
           ? { entitlementToken: options.entitlementToken }
           : {}),

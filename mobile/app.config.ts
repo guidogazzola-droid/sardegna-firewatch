@@ -36,6 +36,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     supportsTablet: false,
     bundleIdentifier: "com.guidogazzola.sardiniafirewatch",
     infoPlist: {
+      CFBundleAllowMixedLocalizations: true,
       ITSAppUsesNonExemptEncryption: false,
     },
   },
@@ -46,10 +47,20 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     "expo-router",
     "expo-dev-client",
     [
+      "expo-localization",
+      {
+        supportedLocales: {
+          ios: ["it", "en", "fr", "de"],
+          android: ["it", "en", "fr", "de"],
+        },
+        supportsRTL: false,
+      },
+    ],
+    [
       "expo-location",
       {
         locationWhenInUsePermission:
-          `${APP_DISPLAY_NAME} usa la tua posizione solo mentre usi l'app, per mostrarti le rilevazioni vicine e creare zone monitorate.`,
+          `${APP_DISPLAY_NAME} uses your location only while you use the app, to show nearby detections and create monitored areas.`,
         isIosBackgroundLocationEnabled: false,
         isAndroidBackgroundLocationEnabled: false,
       },
@@ -59,6 +70,12 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ],
   experiments: {
     typedRoutes: true,
+  },
+  locales: {
+    it: "./locales/it.json",
+    en: "./locales/en.json",
+    fr: "./locales/fr.json",
+    de: "./locales/de.json",
   },
   extra: {
     apiBaseUrl: API_BASE_URL,

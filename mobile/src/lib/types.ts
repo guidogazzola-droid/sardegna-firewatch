@@ -212,6 +212,7 @@ export interface WatchArea {
 export interface AlertSubscription {
   id: string;
   watchArea: WatchArea;
+  language: "it" | "en" | "fr" | "de";
   active: boolean;
   createdAt: string;
   updatedAt: string;
@@ -221,6 +222,7 @@ export interface AlertSubscription {
 export interface StoredAlertRegistration {
   id: string;
   secret: string;
+  language?: "it" | "en" | "fr" | "de";
 }
 
 export interface CreateAlertSubscriptionResponse {

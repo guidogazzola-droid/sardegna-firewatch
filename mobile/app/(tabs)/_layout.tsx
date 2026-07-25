@@ -1,5 +1,6 @@
 import { Tabs } from "expo-router";
 import { Text, type ColorValue } from "react-native";
+import { useI18n } from "../../src/i18n";
 import { useAppTheme } from "../../src/theme";
 
 function TabIcon({ symbol, color }: { symbol: string; color: ColorValue }) {
@@ -8,6 +9,7 @@ function TabIcon({ symbol, color }: { symbol: string; color: ColorValue }) {
 
 export default function TabsLayout() {
   const theme = useAppTheme();
+  const { t } = useI18n();
 
   return (
     <Tabs
@@ -25,35 +27,35 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: "Mappa",
+          title: t("tabs.map"),
           tabBarIcon: ({ color }) => <TabIcon symbol="⌖" color={color} />,
         }}
       />
       <Tabs.Screen
         name="events"
         options={{
-          title: "Eventi",
+          title: t("tabs.events"),
           tabBarIcon: ({ color }) => <TabIcon symbol="●" color={color} />,
         }}
       />
       <Tabs.Screen
         name="alerts"
         options={{
-          title: "Avvisi",
+          title: t("tabs.alerts"),
           tabBarIcon: ({ color }) => <TabIcon symbol="◎" color={color} />,
         }}
       />
       <Tabs.Screen
         name="territories"
         options={{
-          title: "Paesi",
+          title: t("tabs.territories"),
           tabBarIcon: ({ color }) => <TabIcon symbol="◇" color={color} />,
         }}
       />
       <Tabs.Screen
         name="settings"
         options={{
-          title: "Info",
+          title: t("tabs.info"),
           tabBarIcon: ({ color }) => <TabIcon symbol="i" color={color} />,
         }}
       />

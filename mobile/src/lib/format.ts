@@ -1,57 +1,123 @@
 import type { ConfidenceLevel, SeverityLevel } from "./types";
+import {
+  currentLanguage,
+  currentLocale,
+  translate,
+  type AppLanguage,
+} from "../i18n";
 
-const dateFormatter = new Intl.DateTimeFormat("it-IT", {
-  day: "2-digit",
-  month: "short",
-  hour: "2-digit",
-  minute: "2-digit",
-  timeZone: "Europe/Rome",
-});
-
-export function formatObservation(value: string | null | undefined): string {
-  if (!value) return "Orario non disponibile";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Orario non disponibile";
-  return dateFormatter.format(date);
+function dateFormatter(language: AppLanguage) {
+  const deviceLocale = currentLocale();
+  const locale = deviceLocale.toLowerCase().startsWith(language)
+    ? deviceLocale
+    : language;
+  return new Intl.DateTimeFormat(locale, {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
-export function formatAge(minutes: number | null | undefined): string {
-  if (!Number.isFinite(minutes)) return "Eta non disponibile";
+export function formatObservation(
+  value: string | null | undefined,
+  language = currentLanguage(),
+): string {
+  if (!value) return translate("format.timeUnavailable", {}, language);
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return translate("format.timeUnavailable", {}, language);
+  }
+  return dateFormatter(language).format(date);
+}
+
+export function formatAge(
+  minutes: number | null | undefined,
+  language = currentLanguage(),
+): string {
+  if (!Number.isFinite(minutes)) {
+    return translate("format.ageUnavailable", {}, language);
+  }
   const safeMinutes = Math.max(0, Math.round(minutes ?? 0));
-  if (safeMinutes < 60) return `${safeMinutes} min fa`;
+  if (safeMinutes < 60) {
+    return translate("format.minutesAgo", { count: safeMinutes }, language);
+  }
   const hours = Math.floor(safeMinutes / 60);
   const remainingMinutes = safeMinutes % 60;
-  if (hours < 24) return remainingMinutes ? `${hours} h ${remainingMinutes} min fa` : `${hours} h fa`;
+  if (hours < 24) {
+    return translate(
+      "format.hoursAgo",
+      { hours, minutes: remainingMinutes },
+      language,
+    ).replace(/\s+0\s+(min|Min\.)/, "");
+  }
   const days = Math.floor(hours / 24);
-  return `${days} ${days === 1 ? "giorno" : "giorni"} fa`;
+  return translate(
+    "format.daysAgo",
+    {
+      count: days,
+      unit: translate(days === 1 ? "format.day" : "format.days", {}, language),
+    },
+    language,
+  );
 }
 
-export function confidenceLabel(value: ConfidenceLevel): string {
+export function confidenceLabel(
+  value: ConfidenceLevel,
+  language = currentLanguage(),
+): string {
   switch (value) {
     case "high":
-      return "Alta";
+      return translate("confidence.high", {}, language);
     case "nominal":
-      return "Nominale";
+      return translate("confidence.nominal", {}, language);
     case "low":
-      return "Bassa";
+      return translate("confidence.low", {}, language);
     default:
-      return "Non disponibile";
+      return translate("confidence.unknown", {}, language);
   }
 }
 
-export function severityLabel(value: SeverityLevel): string {
+export function severityLabel(
+  value: SeverityLevel,
+  language = currentLanguage(),
+): string {
   switch (value) {
     case "critical":
-      return "Priorita molto alta";
+      return translate("severity.critical", {}, language);
     case "high":
-      return "Priorita alta";
+      return translate("severity.high", {}, language);
     case "medium":
-      return "Priorita media";
+      return translate("severity.medium", {}, language);
     default:
-      return "Priorita bassa";
+      return translate("severity.low", {}, language);
   }
 }
 
-export function formatCoordinate(value: number): string {
-  return value.toFixed(4);
+export function formatCoordinate(
+  value: number,
+  language = currentLanguage(),
+): string {
+  const deviceLocale = currentLocale();
+  const locale = deviceLocale.toLowerCase().startsWith(language)
+    ? deviceLocale
+    : language;
+  return new Intl.NumberFormat(locale, {
+    minimumFractionDigits: 4,
+    maximumFractionDigits: 4,
+  }).format(value);
+}
+
+export function formatNumber(
+  value: number,
+  maximumFractionDigits = 1,
+  language = currentLanguage(),
+): string {
+  const deviceLocale = currentLocale();
+  const locale = deviceLocale.toLowerCase().startsWith(language)
+    ? deviceLocale
+    : language;
+  return new Intl.NumberFormat(locale, {
+    maximumFractionDigits,
+  }).format(value);
 }

@@ -223,6 +223,31 @@ for (const output of outputs) {
   writeFileSync(output, json);
 }
 
+const territoryNames = Object.fromEntries(
+  records.map((territory) => [
+    territory.id,
+    territory.id === "sardinia"
+      ? {
+          it: "Sardegna",
+          en: "Sardinia",
+          fr: "Sardaigne",
+          de: "Sardinien",
+        }
+      : Object.fromEntries(
+          ["it", "en", "fr", "de"].map((language) => [
+            language,
+            new Intl.DisplayNames([language], { type: "region" }).of(
+              territory.countryCode,
+            ) || territory.name,
+          ]),
+        ),
+  ]),
+);
+writeFileSync(
+  resolve(rootDir, "mobile/src/data/territory-names.json"),
+  `${JSON.stringify(territoryNames, null, 2)}\n`,
+);
+
 const manifest = [
   "reference_name,product_id,type,swiss_target_price",
   ...records
@@ -233,5 +258,65 @@ const manifest = [
     ),
 ].join("\n");
 writeFileSync(resolve(rootDir, "data/app-store-products.csv"), `${manifest}\n`);
+
+const appStoreLocales = [
+  {
+    locale: "it",
+    language: "it",
+    description: () => "Mappe, incendi, meteo e avvisi",
+  },
+  {
+    locale: "en-US",
+    language: "en",
+    description: () => "Maps, wildfires, weather and alerts",
+  },
+  {
+    locale: "fr-FR",
+    language: "fr",
+    description: () => "Cartes, incendies, météo et alertes",
+  },
+  {
+    locale: "de-DE",
+    language: "de",
+    description: () => "Karten, Brände, Wetter und Warnungen",
+  },
+];
+
+function csvCell(value) {
+  const text = String(value);
+  return /[",\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+}
+
+const localizationRows = [
+  "product_id,locale,display_name,description",
+  ...records
+    .filter((territory) => !territory.free)
+    .flatMap((territory) =>
+      appStoreLocales.map(({ locale, language, description }) => {
+        const displayName =
+          new Intl.DisplayNames([language], { type: "region" }).of(
+            territory.countryCode,
+          ) || territory.name;
+        const localizedDescription = description(displayName);
+        if (localizedDescription.length > 45) {
+          throw new Error(
+            `Descrizione App Store troppo lunga (${locale}, ${territory.id}): ${localizedDescription}`,
+          );
+        }
+        return [
+          territory.productId,
+          locale,
+          displayName,
+          localizedDescription,
+        ]
+          .map(csvCell)
+          .join(",");
+      }),
+    ),
+].join("\n");
+writeFileSync(
+  resolve(rootDir, "data/app-store-product-localizations.csv"),
+  `${localizationRows}\n`,
+);
 
 console.log(`Generati ${records.length} territori (${records.length - 1} acquisti in-app).`);

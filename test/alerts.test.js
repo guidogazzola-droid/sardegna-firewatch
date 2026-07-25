@@ -59,6 +59,15 @@ test("alert store requires the device secret and deletes all registration data",
     25,
   );
   assert.equal(
+    (
+      await store.getAuthorizedSubscription(
+        created.subscription.id,
+        created.secret,
+      )
+    ).language,
+    "it",
+  );
+  assert.equal(
     await store.deleteSubscription(created.subscription.id, created.secret),
     true,
   );
@@ -146,4 +155,40 @@ test("monitor sends one summary and records its Expo receipt", async (t) => {
     olderThan: new Date(now.getTime() + 16 * 60_000).toISOString(),
   });
   assert.deepEqual(due.map((receipt) => receipt.id), ["receipt-1"]);
+});
+
+test("monitor sends alerts in the subscription language", async (t) => {
+  const store = await temporaryStore(t);
+  await store.createSubscription({
+    expoPushToken: "ExponentPushToken[abc]",
+    watchArea: WATCH_AREA,
+    language: "de",
+  });
+  const messages = [];
+  const now = new Date();
+  const monitor = new AlertMonitor({
+    store,
+    fetchFires: async () => [
+      {
+        id: "fire-de",
+        latitude: 40.93,
+        longitude: 9.5,
+        observedAt: now.toISOString(),
+        confidence: "high",
+        severity: "critical",
+        frp: 80,
+      },
+    ],
+    sendPush: async (nextMessages) => {
+      messages.push(...nextMessages);
+      return [{ status: "ok", id: "receipt-de" }];
+    },
+    fetchReceipts: async () => ({}),
+    logger: { error() {}, warn() {} },
+  });
+
+  await monitor.runOnce(now);
+  assert.equal(messages.length, 1);
+  assert.match(messages[0].title, /Satellitenerfassung/);
+  assert.match(messages[0].body, /Überwachungsgebiet/);
 });

@@ -9,10 +9,12 @@ import {
   PRIVACY_URL,
   SUPPORT_URL,
 } from "../../src/lib/config";
+import { useI18n } from "../../src/i18n";
 import { spacing, useAppTheme } from "../../src/theme";
 
 export default function SettingsScreen() {
   const theme = useAppTheme();
+  const { t, territoryName } = useI18n();
   const { activeTerritory, unlockedTerritoryIds } = useTerritory();
   const { status } = useFireData();
   const weatherCommercial = status?.weatherService?.commercialReady === true;
@@ -21,29 +23,59 @@ export default function SettingsScreen() {
     <SafeAreaView style={[styles.screen, { backgroundColor: theme.background }]} edges={["top"]}>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.header}>
-          <Text style={[styles.title, { color: theme.text }]}>Informazioni</Text>
-          <Text style={[styles.subtitle, { color: theme.textMuted }]}>Fonti, stato del servizio e limiti operativi.</Text>
+          <Text style={[styles.title, { color: theme.text }]}>
+            {t("settings.title")}
+          </Text>
+          <Text style={[styles.subtitle, { color: theme.textMuted }]}>
+            {t("settings.subtitle")}
+          </Text>
         </View>
 
-        <Section title="Stato del servizio">
-          <MetaRow label="Territorio attivo" value={activeTerritory.name} />
+        <Section title={t("settings.serviceStatus")}>
           <MetaRow
-            label="Territori disponibili"
-            value={`${status?.territories?.available ?? 48} · ${unlockedTerritoryIds.size} sbloccati`}
+            label={t("settings.activeTerritory")}
+            value={territoryName(activeTerritory)}
+          />
+          <MetaRow
+            label={t("settings.availableTerritories")}
+            value={t("settings.unlockedCount", {
+              total: status?.territories?.available ?? 48,
+              count: unlockedTerritoryIds.size,
+            })}
           />
           <InfoRow label="NASA FIRMS" enabled={status?.sources.firms ?? false} />
           <InfoRow label="Copernicus EFFIS" enabled={status?.sources.effis ?? true} />
-          <InfoRow label="Vento Open-Meteo" enabled={status?.sources.windMap ?? false} />
-          <InfoRow label="Nuvolosita Open-Meteo" enabled={status?.sources.cloudForecast ?? false} />
-          <InfoRow label="Notifiche di prossimita" enabled={status?.alerts?.available ?? false} />
-          <Text style={[styles.meta, { color: theme.textMuted }]}>Aggiornamento previsto ogni {status?.refreshSeconds ?? 300} secondi.</Text>
+          <InfoRow
+            label={t("settings.windSource")}
+            enabled={status?.sources.windMap ?? false}
+          />
+          <InfoRow
+            label={t("settings.cloudSource")}
+            enabled={status?.sources.cloudForecast ?? false}
+          />
+          <InfoRow
+            label={t("settings.proximityAlerts")}
+            enabled={status?.alerts?.available ?? false}
+          />
+          <Text style={[styles.meta, { color: theme.textMuted }]}>
+            {t("settings.refreshEvery", {
+              seconds: status?.refreshSeconds ?? 300,
+            })}
+          </Text>
         </Section>
 
-        <Section title="Conformita delle fonti">
-          <MetaRow label="Servizio meteo" value={status?.weatherService?.provider ?? "Open-Meteo"} />
+        <Section title={t("settings.sourceCompliance")}>
           <MetaRow
-            label="Modalita meteo"
-            value={weatherCommercial ? "Licenza commerciale attiva" : "Valutazione / test interno"}
+            label={t("settings.weatherService")}
+            value={status?.weatherService?.provider ?? "Open-Meteo"}
+          />
+          <MetaRow
+            label={t("settings.weatherMode")}
+            value={
+              weatherCommercial
+                ? t("settings.commercialActive")
+                : t("settings.evaluation")
+            }
           />
           <View
             style={[
@@ -55,58 +87,67 @@ export default function SettingsScreen() {
             ]}
           >
             <Text style={[styles.complianceTitle, { color: weatherCommercial ? theme.success : theme.warning }]}>
-              {weatherCommercial ? "Configurazione commerciale verificata" : "Rilascio a pagamento non ancora abilitato"}
+              {weatherCommercial
+                ? t("settings.commercialVerified")
+                : t("settings.paidDisabled")}
             </Text>
             <Text style={[styles.meta, { color: theme.textMuted }]}>
               {weatherCommercial
-                ? "Il backend dichiara l'endpoint commerciale configurato. La verifica dei termini resta parte della checklist di rilascio."
-                : "Questa build usa i dati meteo in modalita di valutazione. Prima della vendita pubblica servono endpoint e chiave commerciali conformi."}
+                ? t("settings.commercialBody")
+                : t("settings.evaluationBody")}
             </Text>
           </View>
         </Section>
 
-        <Section title="Uso corretto dei dati">
-          <Text style={[styles.body, { color: theme.text }]}>{APP_DISPLAY_NAME} e uno strumento informativo, non un sistema ufficiale di emergenza.</Text>
-          <Text style={[styles.body, { color: theme.textMuted }]}>Una rilevazione termica satellitare puo essere incompleta, ritardata o dovuta a una sorgente di calore diversa da un incendio. Vento, nuvole e traiettorie sono dati modellati o stime e non sostituiscono le comunicazioni delle autorita competenti.</Text>
+        <Section title={t("settings.correctUse")}>
+          <Text style={[styles.body, { color: theme.text }]}>
+            {t("settings.informationalTool", { app: APP_DISPLAY_NAME })}
+          </Text>
+          <Text style={[styles.body, { color: theme.textMuted }]}>
+            {t("settings.dataDisclaimer")}
+          </Text>
           <View style={[styles.emergency, { backgroundColor: `${theme.danger}15`, borderColor: `${theme.danger}50` }]}>
-            <Text style={[styles.emergencyTitle, { color: theme.danger }]}>In presenza di fumo o fiamme</Text>
-            <Text style={[styles.body, { color: theme.text }]}>Contatta immediatamente il 112 o il 1515 e fornisci posizione e riferimenti visibili.</Text>
+            <Text style={[styles.emergencyTitle, { color: theme.danger }]}>
+              {t("settings.smokeOrFlames")}
+            </Text>
+            <Text style={[styles.body, { color: theme.text }]}>
+              {t("settings.emergencyBody")}
+            </Text>
           </View>
         </Section>
 
-        <Section title="Fonti e attribuzioni">
+        <Section title={t("settings.sources")}>
           <ExternalLink label="NASA FIRMS" url="https://firms.modaps.eosdis.nasa.gov/" />
           <ExternalLink label="Copernicus EFFIS" url="https://forest-fire.emergency.copernicus.eu/" />
           <ExternalLink label="Open-Meteo" url="https://open-meteo.com/" />
           <ExternalLink label="Apple Maps" url="https://www.apple.com/legal/internet-services/maps/" />
-          <ExternalLink label="Bollettino Regione Sardegna" url="https://www.sardegnaambiente.it/index.php?c=7093&s=20&v=9&xsl=2273" />
+          <ExternalLink
+            label={t("settings.sardiniaBulletin")}
+            url="https://www.sardegnaambiente.it/index.php?c=7093&s=20&v=9&xsl=2273"
+          />
         </Section>
 
-        <Section title="Privacy e assistenza">
-          <ExternalLink label="Informativa privacy" url={PRIVACY_URL} />
-          <ExternalLink label="Supporto Sabetta Piro" url={SUPPORT_URL} />
+        <Section title={t("settings.privacySupport")}>
+          <ExternalLink label={t("settings.privacy")} url={PRIVACY_URL} />
+          <ExternalLink label={t("settings.support")} url={SUPPORT_URL} />
         </Section>
 
-        <Section title="Acquisti nell'app">
+        <Section title={t("settings.purchases")}>
           <Text style={[styles.body, { color: theme.text }]}>
-            La Sardegna è gratuita. Ogni Paese aggiuntivo è un acquisto
-            non consumabile separato, senza abbonamento.
+            {t("settings.purchaseBody")}
           </Text>
           <Text style={[styles.meta, { color: theme.textMuted }]}>
-            Gli acquisti sono gestiti da Apple e possono essere ripristinati
-            dalla sezione Paesi.
+            {t("settings.purchaseMeta")}
           </Text>
         </Section>
 
-        <Section title="Versione tecnica">
-          <MetaRow label="Nome pubblico" value={APP_DISPLAY_NAME} />
+        <Section title={t("settings.technicalVersion")}>
+          <MetaRow label={t("settings.publicName")} value={APP_DISPLAY_NAME} />
           <MetaRow label="App" value={APP_VERSION} />
           <MetaRow label="Bundle ID" value="com.guidogazzola.sardiniafirewatch" />
           <MetaRow label="Backend" value={API_BASE_URL} />
           <Text style={[styles.meta, { color: theme.textMuted }]}>
-            Non e richiesto alcun account. Se attivi le notifiche, token push,
-            coordinate e raggio vengono conservati dal servizio fino alla
-            disattivazione.
+            {t("settings.noAccount")}
           </Text>
         </Section>
       </ScrollView>
@@ -126,13 +167,16 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 function InfoRow({ label, enabled }: { label: string; enabled: boolean }) {
   const theme = useAppTheme();
+  const { t } = useI18n();
   const color = enabled ? theme.success : theme.warning;
   return (
     <View style={styles.row}>
       <Text style={[styles.rowLabel, { color: theme.text }]}>{label}</Text>
       <View style={[styles.statusPill, { backgroundColor: `${color}18` }]}>
         <View style={[styles.statusDot, { backgroundColor: color }]} />
-        <Text style={[styles.statusLabel, { color }]}>{enabled ? "Attivo" : "Limitato"}</Text>
+        <Text style={[styles.statusLabel, { color }]}>
+          {enabled ? t("common.active") : t("common.limited")}
+        </Text>
       </View>
     </View>
   );

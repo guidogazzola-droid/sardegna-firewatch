@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchCloudForecast, fetchWindGrid } from "../lib/api";
 import type { Territory } from "../lib/territories";
 import type { CloudFrame, GeoBounds, WindSample } from "../lib/types";
+import { translate } from "../i18n";
 
 function readableError(error: unknown, fallback: string): string {
   if (error instanceof Error && error.message) return error.message;
@@ -57,7 +58,7 @@ export function useWeatherLayers(territory: Territory): WeatherLayersState {
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") return;
       if (windController.current !== controller) return;
-      setWindError(readableError(error, "Vento temporaneamente non disponibile."));
+      setWindError(readableError(error, translate("errors.windUnavailable")));
     } finally {
       if (windController.current === controller) setIsWindLoading(false);
     }
@@ -86,7 +87,7 @@ export function useWeatherLayers(territory: Territory): WeatherLayersState {
       } catch (error) {
         if (error instanceof Error && error.name === "AbortError") return;
         if (cloudController.current !== controller) return;
-        setCloudError(readableError(error, "Nuvolosita temporaneamente non disponibile."));
+        setCloudError(readableError(error, translate("errors.cloudUnavailable")));
       } finally {
         if (cloudController.current === controller) setIsCloudLoading(false);
       }

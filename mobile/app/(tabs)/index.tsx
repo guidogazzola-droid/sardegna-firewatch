@@ -21,9 +21,14 @@ import { useWeatherLayers } from "../../src/hooks/use-weather-layers";
 import { fetchWindHistory } from "../../src/lib/api";
 import { APP_DISPLAY_NAME } from "../../src/lib/config";
 import {
+  localizedCompassLabel,
+  useI18n,
+} from "../../src/i18n";
+import {
   confidenceLabel,
   formatAge,
   formatCoordinate,
+  formatNumber,
   formatObservation,
   severityLabel,
 } from "../../src/lib/format";
@@ -65,6 +70,7 @@ function cloudOpacity(cover: number): string {
 
 export default function MapScreen() {
   const theme = useAppTheme();
+  const { language, t, territoryName } = useI18n();
   const router = useRouter();
   const { activeTerritory } = useTerritory();
   const mapRef = useRef<MapView | null>(null);
@@ -198,12 +204,12 @@ export default function MapScreen() {
       setHistoryError(
         analysisError instanceof Error
           ? analysisError.message
-          : "Analisi del vento temporaneamente non disponibile.",
+          : t("map.windAnalysisUnavailable"),
       );
     } finally {
       if (historyController.current === controller) setHistoryLoading(false);
     }
-  }, [activeTerritory.id, historyLoading, selectedFire]);
+  }, [activeTerritory.id, historyLoading, selectedFire, t]);
 
   useEffect(() => {
     historyController.current?.abort();
@@ -227,19 +233,21 @@ export default function MapScreen() {
         <View style={styles.headerText}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Scegli territorio"
+            accessibilityLabel={t("map.chooseTerritory")}
             onPress={() => router.push("/(tabs)/territories")}
           >
             <Text style={[styles.eyebrow, { color: theme.accent }]}>
-              {activeTerritory.name.toUpperCase()} ▾
+              {territoryName(activeTerritory).toLocaleUpperCase(language)} ▾
             </Text>
           </Pressable>
           <Text style={[styles.title, { color: theme.text }]}>{APP_DISPLAY_NAME}</Text>
-          <Text style={[styles.subtitle, { color: theme.textMuted }]}>Incendi, vento e nuvolosita in un'unica vista</Text>
+          <Text style={[styles.subtitle, { color: theme.textMuted }]}>
+            {t("map.subtitle")}
+          </Text>
         </View>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Aggiorna tutti i dati"
+          accessibilityLabel={t("map.refresh")}
           disabled={isRefreshing || isWindLoading || isCloudLoading}
           onPress={() => void refreshAll()}
           style={({ pressed }) => [
@@ -263,15 +271,17 @@ export default function MapScreen() {
         <StatusBanner text={error} tone="error" />
       ) : isLimitedMode ? (
         <StatusBanner
-          text="Feed puntuale NASA FIRMS limitato; vento e nuvolosita restano consultabili."
+          text={t("map.limitedFeed")}
           tone="warning"
         />
       ) : (
         <StatusBanner
           text={
             lastSuccessfulAt
-              ? `Dati aggiornati ${formatObservation(lastSuccessfulAt)}`
-              : "Connessione alle fonti in corso"
+              ? t("map.updated", {
+                  time: formatObservation(lastSuccessfulAt, language),
+                })
+              : t("map.connecting")
           }
           tone="ok"
         />
@@ -280,7 +290,6 @@ export default function MapScreen() {
       <View style={styles.layerToolbar}>
         <View style={[styles.segmentedControl, { backgroundColor: theme.surface, borderColor: theme.border }]}>
           {BASE_MAP_ORDER.map((id) => {
-            const definition = BASE_MAPS[id];
             const active = id === baseMapId;
             return (
               <Pressable
@@ -294,21 +303,27 @@ export default function MapScreen() {
                 ]}
               >
                 <Text style={[styles.segmentLabel, { color: active ? theme.accent : theme.textMuted }]}>
-                  {definition.shortLabel}
+                  {t(
+                    id === "satellite"
+                      ? "map.baseSatellite"
+                      : id === "topographic"
+                        ? "map.baseTopographic"
+                        : "map.baseStreet",
+                  )}
                 </Text>
               </Pressable>
             );
           })}
         </View>
         <LayerToggle
-          label="Vento"
+          label={t("map.wind")}
           symbol="↗"
           active={windEnabled}
           busy={isWindLoading}
           onPress={() => setWindEnabled((value) => !value)}
         />
         <LayerToggle
-          label="Nuvole"
+          label={t("map.clouds")}
           symbol="☁"
           active={cloudEnabled}
           busy={isCloudLoading}
@@ -441,15 +456,27 @@ export default function MapScreen() {
         {isLoading || !isMapReady ? (
           <View style={[styles.loadingOverlay, { backgroundColor: `${theme.background}d9` }]}>
             <ActivityIndicator size="large" color={theme.accent} />
-            <Text style={[styles.loadingText, { color: theme.text }]}>Caricamento della mappa...</Text>
+            <Text style={[styles.loadingText, { color: theme.text }]}>
+              {t("map.loading")}
+            </Text>
           </View>
         ) : null}
 
         <View style={[styles.legend, { backgroundColor: `${theme.surface}ee`, borderColor: theme.border }]}>
           <View style={[styles.legendDot, { backgroundColor: severityColors.high }]} />
-          <Text style={[styles.legendText, { color: theme.text }]}>Rilevazioni</Text>
-          {windEnabled ? <Text style={[styles.legendText, { color: theme.text }]}>↗ vento km/h</Text> : null}
-          {cloudEnabled ? <Text style={[styles.legendText, { color: theme.text }]}>☁ previsione</Text> : null}
+          <Text style={[styles.legendText, { color: theme.text }]}>
+            {t("map.detections")}
+          </Text>
+          {windEnabled ? (
+            <Text style={[styles.legendText, { color: theme.text }]}>
+              {t("map.windLegend")}
+            </Text>
+          ) : null}
+          {cloudEnabled ? (
+            <Text style={[styles.legendText, { color: theme.text }]}>
+              {t("map.forecastLegend")}
+            </Text>
+          ) : null}
         </View>
 
         {selectedFire ? (
@@ -482,14 +509,25 @@ export default function MapScreen() {
       {windError ? <Text style={[styles.inlineError, { color: theme.warning }]}>{windError}</Text> : null}
 
       <View style={[styles.summary, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-        <SummaryMetric label="Rilevazioni" value={String(feed?.stats.total ?? 0)} />
         <SummaryMetric
-          label="Vento"
-          value={windSamples.length ? `${Math.round(windSamples[0]?.speed ?? 0)} km/h` : "n.d."}
+          label={t("map.detections")}
+          value={String(feed?.stats.total ?? 0)}
         />
         <SummaryMetric
-          label="Nuvole"
-          value={activeCloudFrame ? `${activeCloudFrame.averageCover}%` : "n.d."}
+          label={t("map.wind")}
+          value={
+            windSamples.length
+              ? `${Math.round(windSamples[0]?.speed ?? 0)} km/h`
+              : t("common.notAvailable")
+          }
+        />
+        <SummaryMetric
+          label={t("map.clouds")}
+          value={
+            activeCloudFrame
+              ? `${activeCloudFrame.averageCover}%`
+              : t("common.notAvailable")
+          }
         />
       </View>
     </SafeAreaView>
@@ -553,11 +591,12 @@ function CloudTimeline({
   onToggle: () => void;
 }) {
   const theme = useAppTheme();
+  const { language, t } = useI18n();
   return (
     <View style={[styles.cloudTimeline, { backgroundColor: theme.surface, borderColor: theme.border }]}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Fotogramma nuvole precedente"
+        accessibilityLabel={t("map.cloudPrevious")}
         disabled={!frameCount || frameIndex <= 0}
         onPress={onPrevious}
         style={styles.timelineButton}
@@ -566,7 +605,9 @@ function CloudTimeline({
       </Pressable>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={playing ? "Metti in pausa le nuvole" : "Avvia animazione nuvole"}
+        accessibilityLabel={
+          playing ? t("map.cloudPause") : t("map.cloudPlay")
+        }
         disabled={frameCount < 2}
         onPress={onToggle}
         style={[styles.playButton, { backgroundColor: theme.accentSoft }]}
@@ -579,15 +620,24 @@ function CloudTimeline({
       </Pressable>
       <View style={styles.timelineText}>
         <Text style={[styles.timelineTitle, { color: theme.text }]}>
-          {frameTime ? formatObservation(frameTime) : "Nuvolosita non disponibile"}
+          {frameTime
+            ? formatObservation(frameTime, language)
+            : t("map.cloudUnavailable")}
         </Text>
         <Text style={[styles.timelineMeta, { color: error ? theme.warning : theme.textMuted }]} numberOfLines={1}>
-          {error ?? (averageCover === null ? "Previsione modellata" : `Copertura media ${averageCover}% · ${frameIndex + 1}/${frameCount}`)}
+          {error ??
+            (averageCover === null
+              ? t("map.modeledForecast")
+              : t("map.averageCover", {
+                  cover: averageCover,
+                  current: frameIndex + 1,
+                  total: frameCount,
+                }))}
         </Text>
       </View>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Fotogramma nuvole successivo"
+        accessibilityLabel={t("map.cloudNext")}
         disabled={!frameCount || frameIndex >= frameCount - 1}
         onPress={onNext}
         style={styles.timelineButton}
@@ -614,31 +664,59 @@ function FirePanel({
   onClose: () => void;
 }) {
   const theme = useAppTheme();
+  const { language, t } = useI18n();
   return (
     <View style={[styles.firePanel, { backgroundColor: `${theme.surface}f5`, borderColor: theme.border }]}>
       <View style={styles.firePanelHeader}>
         <View style={styles.firePanelTitleBlock}>
           <Text style={[styles.firePanelEyebrow, { color: severityColors[fire.severity] }]}>
-            {severityLabel(fire.severity)}
+            {severityLabel(fire.severity, language)}
           </Text>
-          <Text style={[styles.firePanelTitle, { color: theme.text }]}>Rilevazione termica</Text>
+          <Text style={[styles.firePanelTitle, { color: theme.text }]}>
+            {t("map.thermalDetection")}
+          </Text>
           <Text style={[styles.firePanelMeta, { color: theme.textMuted }]}>
-            {formatObservation(fire.observedAt)} · {formatAge(fire.ageMinutes)}
+            {formatObservation(fire.observedAt, language)} ·{" "}
+            {formatAge(fire.ageMinutes, language)}
           </Text>
         </View>
-        <Pressable accessibilityRole="button" accessibilityLabel="Chiudi dettaglio" onPress={onClose} style={styles.closeButton}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t("map.closeDetail")}
+          onPress={onClose}
+          style={styles.closeButton}
+        >
           <Text style={[styles.closeButtonText, { color: theme.textMuted }]}>×</Text>
         </Pressable>
       </View>
       <Text style={[styles.firePanelBody, { color: theme.textMuted }]}>
-        {fire.instrument || fire.source} · affidabilita {confidenceLabel(fire.confidence)} · {formatCoordinate(fire.latitude)}, {formatCoordinate(fire.longitude)}
+        {fire.instrument || fire.source} ·{" "}
+        {t("map.reliability", {
+          value: confidenceLabel(fire.confidence, language),
+        })}{" "}
+        · {formatCoordinate(fire.latitude, language)};{" "}
+        {formatCoordinate(fire.longitude, language)}
       </Text>
       {history ? (
         <View style={[styles.smokeSummary, { backgroundColor: `${theme.accent}12` }]}>
-          <Text style={[styles.smokeSummaryTitle, { color: theme.text }]}>Deriva indicativa del fumo</Text>
-          <Text style={[styles.smokeSummaryValue, { color: theme.accent }]}>verso {history.summary.smokeToLabel} · vento medio {history.summary.averageSpeed} km/h</Text>
+          <Text style={[styles.smokeSummaryTitle, { color: theme.text }]}>
+            {t("map.smokeDrift")}
+          </Text>
+          <Text style={[styles.smokeSummaryValue, { color: theme.accent }]}>
+            {t("map.smokeSummary", {
+              direction: localizedCompassLabel(
+                history.summary.smokeToDegrees,
+                language,
+              ),
+              speed: formatNumber(
+                history.summary.averageSpeed,
+                1,
+                language,
+              ),
+            })}
+          </Text>
           <Text style={[styles.smokeSummaryNote, { color: theme.textMuted }]}>
-            Stima semplificata, non modello di dispersione e non previsione ufficiale.
+            {t("map.smokeDisclaimer")}
           </Text>
         </View>
       ) : (
@@ -648,7 +726,13 @@ function FirePanel({
           onPress={onAnalyze}
           style={[styles.analyzeButton, { backgroundColor: theme.accent }]}
         >
-          {loading ? <ActivityIndicator color="#ffffff" /> : <Text style={styles.analyzeButtonText}>Analizza vento e fumo</Text>}
+          {loading ? (
+            <ActivityIndicator color="#ffffff" />
+          ) : (
+            <Text style={styles.analyzeButtonText}>
+              {t("map.analyzeWind")}
+            </Text>
+          )}
         </Pressable>
       )}
       {error ? <Text style={[styles.firePanelError, { color: theme.warning }]}>{error}</Text> : null}
