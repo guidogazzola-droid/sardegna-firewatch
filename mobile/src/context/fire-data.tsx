@@ -11,6 +11,7 @@ import {
 import { DEFAULT_REFRESH_SECONDS } from "../lib/config";
 import { fetchFireFeed, fetchSystemStatus } from "../lib/api";
 import type { FireDetection, FireFeedResponse, SystemStatusResponse } from "../lib/types";
+import { useTerritory } from "./territory";
 
 interface RefreshOptions {
   initial?: boolean;
@@ -36,6 +37,7 @@ function errorMessage(error: unknown): string {
 }
 
 export function FireDataProvider({ children }: { children: ReactNode }) {
+  const { activeTerritory } = useTerritory();
   const [status, setStatus] = useState<SystemStatusResponse | null>(null);
   const [feed, setFeed] = useState<FireFeedResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -56,7 +58,12 @@ export function FireDataProvider({ children }: { children: ReactNode }) {
     try {
       const [nextStatus, nextFeed] = await Promise.all([
         fetchSystemStatus(controller.signal),
-        fetchFireFeed({ days: 1, sources: "viirs", signal: controller.signal }),
+        fetchFireFeed({
+          days: 1,
+          sources: "viirs",
+          territoryId: activeTerritory.id,
+          signal: controller.signal,
+        }),
       ]);
 
       if (activeController.current !== controller) return;
@@ -75,7 +82,7 @@ export function FireDataProvider({ children }: { children: ReactNode }) {
         setIsRefreshing(false);
       }
     }
-  }, []);
+  }, [activeTerritory.id]);
 
   useEffect(() => {
     void load({ initial: true });
@@ -87,7 +94,7 @@ export function FireDataProvider({ children }: { children: ReactNode }) {
       clearInterval(interval);
       activeController.current?.abort();
     };
-  }, [load]);
+  }, [activeTerritory.id, load]);
 
   const value = useMemo<FireDataContextValue>(
     () => ({

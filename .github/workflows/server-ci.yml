@@ -7,6 +7,8 @@ on:
       - "server.js"
       - "lib/**"
       - "test/**"
+      - "data/**"
+      - "scripts/**"
       - "package.json"
       - "package-lock.json"
       - ".env.example"
@@ -38,3 +40,8 @@ jobs:
 
       - name: Run backend tests
         run: npm test
+
+      - name: Rebuild and verify territory data
+        run: |
+          npm run generate:territories
+          git diff --exit-code -- data/territories.json mobile/src/data/territories.json data/app-store-products.csv

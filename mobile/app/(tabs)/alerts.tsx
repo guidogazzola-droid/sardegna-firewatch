@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFireData } from "../../src/context/fire-data";
+import { useTerritory } from "../../src/context/territory";
 import {
   createAlertSubscription,
   deleteAlertSubscription,
@@ -20,6 +21,11 @@ import {
 } from "../../src/lib/api";
 import { PRIVACY_URL } from "../../src/lib/config";
 import { getPushNotificationToken } from "../../src/lib/push-notifications";
+import {
+  DEFAULT_TERRITORY,
+  getTerritory,
+  isPointInTerritory,
+} from "../../src/lib/territories";
 import type { StoredAlertRegistration, WatchArea } from "../../src/lib/types";
 import { spacing, useAppTheme } from "../../src/theme";
 
@@ -31,6 +37,7 @@ type MessageKind = "success" | "error" | "info";
 export default function AlertsScreen() {
   const theme = useAppTheme();
   const { fires, status } = useFireData();
+  const { activeTerritory, purchaseToken } = useTerritory();
   const [watchArea, setWatchArea] = useState<WatchArea | null>(null);
   const [registration, setRegistration] =
     useState<StoredAlertRegistration | null>(null);
@@ -47,7 +54,11 @@ export default function AlertsScreen() {
     ]).then(([storedArea, storedRegistration]) => {
       if (storedArea) {
         try {
-          setWatchArea(JSON.parse(storedArea) as WatchArea);
+          const parsed = JSON.parse(storedArea) as WatchArea;
+          setWatchArea({
+            ...parsed,
+            territoryId: parsed.territoryId || DEFAULT_TERRITORY.id,
+          });
         } catch {
           void AsyncStorage.removeItem(WATCH_AREA_STORAGE_KEY);
         }
@@ -66,7 +77,7 @@ export default function AlertsScreen() {
   }, []);
 
   const nearbyCount = useMemo(() => {
-    if (!watchArea) return 0;
+    if (!watchArea || watchArea.territoryId !== activeTerritory.id) return 0;
     return fires.filter(
       (fire) =>
         distanceKm(
@@ -76,7 +87,7 @@ export default function AlertsScreen() {
           fire.longitude,
         ) <= watchArea.radiusKm,
     ).length;
-  }, [fires, watchArea]);
+  }, [activeTerritory.id, fires, watchArea]);
 
   function showMessage(text: string, kind: MessageKind) {
     setMessage(text);
@@ -87,10 +98,12 @@ export default function AlertsScreen() {
     setWatchArea(next);
     await AsyncStorage.setItem(WATCH_AREA_STORAGE_KEY, JSON.stringify(next));
     if (!registration) return;
+    const territory = getTerritory(next.territoryId);
     try {
       await updateAlertSubscription({
         ...registration,
         watchArea: next,
+        entitlementToken: territory ? purchaseToken(territory) : null,
       });
       showMessage("Zona aggiornata anche per le notifiche.", "success");
     } catch (error) {
@@ -116,10 +129,24 @@ export default function AlertsScreen() {
       const location = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
       });
+      if (
+        !isPointInTerritory(
+          activeTerritory,
+          location.coords.latitude,
+          location.coords.longitude,
+        )
+      ) {
+        showMessage(
+          `La posizione attuale non si trova in ${activeTerritory.name}. Seleziona il territorio corretto prima di creare la zona.`,
+          "error",
+        );
+        return;
+      }
       const now = new Date().toISOString();
       await persistWatchArea({
         id: "primary",
-        name: "La mia posizione",
+        territoryId: activeTerritory.id,
+        name: `La mia posizione · ${activeTerritory.name}`,
         latitude: location.coords.latitude,
         longitude: location.coords.longitude,
         radiusKm: watchArea?.radiusKm ?? 25,
@@ -164,11 +191,17 @@ export default function AlertsScreen() {
           ...registration,
           expoPushToken,
           watchArea,
+          entitlementToken: purchaseToken(
+            getTerritory(watchArea.territoryId) ?? DEFAULT_TERRITORY,
+          ),
         });
       } else {
         const created = await createAlertSubscription({
           expoPushToken,
           watchArea,
+          entitlementToken: purchaseToken(
+            getTerritory(watchArea.territoryId) ?? DEFAULT_TERRITORY,
+          ),
         });
         nextRegistration = {
           id: created.subscription.id,
@@ -258,7 +291,7 @@ export default function AlertsScreen() {
         <View style={styles.header}>
           <Text style={[styles.title, { color: theme.text }]}>Avvisi</Text>
           <Text style={[styles.subtitle, { color: theme.textMuted }]}>
-            Monitora una zona senza creare un account.
+            Monitora una zona in {activeTerritory.name} senza creare un account.
           </Text>
         </View>
 
@@ -281,6 +314,14 @@ export default function AlertsScreen() {
               <Text style={[styles.coordinates, { color: theme.textMuted }]}>
                 {watchArea.latitude.toFixed(4)}, {watchArea.longitude.toFixed(4)}
               </Text>
+              {watchArea.territoryId !== activeTerritory.id ? (
+                <Text style={[styles.message, { color: theme.warning }]}>
+                  Questa zona appartiene a{" "}
+                  {getTerritory(watchArea.territoryId)?.name ?? "un altro territorio"}.
+                  Se usi la posizione attuale verrà sostituita con una zona in{" "}
+                  {activeTerritory.name}.
+                </Text>
+              ) : null}
               <View style={styles.radiusRow}>
                 <CircleButton
                   label="−"

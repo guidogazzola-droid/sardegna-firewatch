@@ -1,6 +1,9 @@
-# Sardegna FireWatch
+# Sabetta Piro / Sardegna FireWatch
 
-Dashboard web responsive per osservare **hotspot satellitari, aree bruciate recenti e pericolo meteorologico d'incendio in Sardegna**.
+Backend, dashboard web e applicazione iOS per osservare **hotspot
+satellitari, vento, nuvolosita e avvisi di prossimita**. La Sardegna resta il
+territorio gratuito; la versione iOS 0.3 introduce un catalogo di Paesi europei
+sbloccabili singolarmente tramite acquisti in-app non consumabili.
 
 Il progetto usa due livelli di servizio:
 
@@ -24,6 +27,11 @@ Il progetto usa due livelli di servizio:
 - area personale con raggio da 5 a 100 km;
 - notifiche browser per nuovi hotspot vicini, mentre la pagina web e aperta;
 - registro anonimo delle zone iOS e notifiche push native anche ad app chiusa;
+- Sardegna inclusa gratuitamente e 47 Paesi europei acquistabili separatamente;
+- confini operativi di Stato, selezione persistente del territorio e
+  ripristino degli acquisti Apple;
+- verifica StoreKit 2 lato dispositivo e verifica delle transazioni firmate
+  Apple per gli alert dei territori a pagamento;
 - aggiornamento automatico, cache server e tolleranza al guasto di una singola sorgente;
 - PWA installabile, interfaccia mobile e modalita a contrasto elevato;
 - numeri di emergenza 1515 e 112 sempre visibili.
@@ -63,6 +71,9 @@ La chiave resta sul server: non viene mai inviata al browser.
 | `ALERT_STORE_PATH` | `.data/alerts.json` | Registro notifiche; in produzione deve trovarsi su storage persistente |
 | `ALERT_MONITOR_INTERVAL_MS` | `300000` | Frequenza del controllo push, minimo 60 secondi |
 | `EXPO_ACCESS_TOKEN` | vuota | Token facoltativo se Expo Push Security e attiva |
+| `OPEN_METEO_FORECAST_URL` | API pubblica | In produzione commerciale usare l'endpoint customer |
+| `OPEN_METEO_API_KEY` | vuota | Chiave del piano Open-Meteo commerciale |
+| `OPEN_METEO_REQUIRE_COMMERCIAL` | `false` | Impostare `true` nel servizio pubblico |
 | `NODE_ENV` | `development` | Usare `production` in distribuzione |
 
 ## Docker
@@ -90,11 +101,13 @@ Aggiungere `FIRMS_MAP_KEY` come variabile segreta nell'ambiente di hosting. Per 
 
 - `GET /api/health` — controllo di disponibilita;
 - `GET /api/status` — modalita e sorgenti abilitate;
-- `GET /api/fires?days=1&sources=viirs` — rilevamenti normalizzati;
-- `GET /api/weather?lat=40.0&lon=9.0` — meteo locale per un punto.
-- `GET /api/wind-history?lat=40.0&lon=9.0&start=2026-07-18T10:00:00Z` — storico del vento e direzione indicativa del fumo.
-- `GET /api/wind-grid?south=38.7&west=7.7&north=41.4&east=10.2&rows=4&columns=5` — griglia del vento attuale per l'area visibile.
-- `GET /api/cloud-forecast` — sequenza oraria della copertura nuvolosa modellata sulla Sardegna.
+- `GET /api/territories` — catalogo territoriale senza geometrie;
+- `GET /api/territories/:id` — metadati e confine del territorio;
+- `GET /api/fires?territory=switzerland&days=1&sources=viirs` — rilevamenti normalizzati;
+- `GET /api/weather?territory=italy&lat=41.9&lon=12.5` — meteo locale per un punto.
+- `GET /api/wind-history?territory=italy&lat=41.9&lon=12.5&start=2026-07-18T10:00:00Z` — storico del vento e direzione indicativa del fumo.
+- `GET /api/wind-grid?territory=sardinia&south=38.7&west=7.7&north=41.4&east=10.2&rows=4&columns=5` — griglia del vento attuale per l'area visibile.
+- `GET /api/cloud-forecast?territory=sardinia` — sequenza oraria della copertura nuvolosa modellata.
 - `POST /api/alerts/subscriptions` — registra anonimamente token push e zona monitorata.
 - `PATCH /api/alerts/subscriptions/:id` — aggiorna la zona usando la chiave conservata sul dispositivo.
 - `DELETE /api/alerts/subscriptions/:id` — cancella definitivamente la registrazione.
@@ -108,14 +121,21 @@ Valori ammessi per `sources`: `viirs`, `modis`, `all`. L'intervallo `days` e lim
 npm test
 ```
 
-I test coprono parsing CSV, normalizzazione della confidenza, orari UTC, classificazione della priorita, limiti geografici, stima dell'inizio evento, calcoli vettoriali del vento, autenticazione del registro notifiche, filtri di prossimita e deduplicazione.
+I test coprono parsing CSV, normalizzazione della confidenza, orari UTC,
+classificazione della priorita, confini territoriali, catalogo prodotti,
+verifica minima degli entitlement, stima dell'inizio evento, calcoli
+vettoriali del vento, autenticazione del registro notifiche, filtri di
+prossimita e deduplicazione.
 
 ## Struttura
 
 ```text
 sardegna-firewatch/
 ├── lib/                  # client FIRMS, cache e configurazione
+├── data/                 # catalogo/confini e manifest prodotti App Store
+├── mobile/               # applicazione Expo iOS
 ├── public/               # interfaccia, PWA e librerie cartografiche
+├── scripts/              # generazione riproducibile dei territori
 ├── test/                 # test automatici
 ├── server.js             # API proxy e server statico
 ├── Dockerfile
@@ -132,8 +152,21 @@ sardegna-firewatch/
 - Esri World Imagery: attribuzione mostrata sulla mappa
 - OpenTopoMap: <https://opentopomap.org/about>
 - Leaflet e Leaflet.markercluster: licenze incluse in `public/vendor/`
+- Natural Earth / world-atlas: confini territoriali semplificati
 
-I contenuti EFFIS sono soggetti alle condizioni e alle attribuzioni Copernicus/Commissione europea. Verificare le condizioni dei singoli fornitori prima di un uso commerciale o operativo.
+I confini sono semplificati per uso operativo e non costituiscono una
+determinazione ufficiale o una presa di posizione su territori contesi. I
+contenuti EFFIS sono soggetti alle condizioni e alle attribuzioni
+Copernicus/Commissione europea. Verificare le condizioni dei singoli fornitori
+prima di un uso commerciale o operativo.
+
+## Acquisti territoriali iOS
+
+La Sardegna e incorporata gratuitamente. I 47 prodotti elencati in
+`data/app-store-products.csv` devono essere creati in App Store Connect come
+**non-consumable**, mantenendo esattamente i product ID del manifest. Il prezzo
+obiettivo nello storefront svizzero e CHF 5; l'app visualizza sempre il prezzo
+localizzato restituito da StoreKit e offre il comando **Ripristina acquisti**.
 
 ## Limiti operativi
 

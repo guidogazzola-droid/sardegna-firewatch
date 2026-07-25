@@ -41,12 +41,26 @@ Il codice funziona anche senza disco per test locali, ma un riavvio o un deploy
 cancellerebbe le registrazioni. L'attivazione del disco e quindi un requisito di
 rilascio, non un miglioramento facoltativo.
 
+### Dati meteo commerciali
+
+Per una distribuzione con acquisti in-app configura anche:
+
+```text
+OPEN_METEO_FORECAST_URL=https://customer-api.open-meteo.com/v1/forecast
+OPEN_METEO_API_KEY=<segreto>
+OPEN_METEO_REQUIRE_COMMERCIAL=true
+```
+
+La chiave deve restare esclusivamente nell'ambiente Render.
+
 ## 4. Verificare il deploy
 
 Sostituisci `TUO-SERVIZIO.onrender.com` con il dominio assegnato:
 
 - `https://TUO-SERVIZIO.onrender.com/api/health` deve restituire `"ok": true`;
 - `https://TUO-SERVIZIO.onrender.com/api/status` deve mostrare `"mode": "full"` e `"firmsConfigured": true`;
+- la stessa risposta deve mostrare `territories.available: 48`;
+- `https://TUO-SERVIZIO.onrender.com/api/territories` deve restituire Sardegna e 47 Paesi;
 - la pagina principale deve caricare la mappa.
 
 Se `/api/status` mostra `effis-only`, la chiave FIRMS non e configurata o il servizio non e stato ridistribuito dopo averla aggiunta.

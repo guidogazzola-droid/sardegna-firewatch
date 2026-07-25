@@ -102,6 +102,7 @@ export function fetchFireFeed(
   options: {
     days?: number;
     sources?: FireSourceGroup;
+    territoryId?: string;
     signal?: AbortSignal;
   } = {},
 ): Promise<FireFeedResponse> {
@@ -110,6 +111,7 @@ export function fetchFireFeed(
   const query = new URLSearchParams({
     days: String(days),
     sources,
+    territory: options.territoryId ?? "sardinia",
   });
 
   return requestJson<FireFeedResponse>(`/api/fires?${query.toString()}`, options.signal);
@@ -120,6 +122,7 @@ export function fetchWindGrid(
     bounds: GeoBounds;
     rows?: number;
     columns?: number;
+    territoryId: string;
     signal?: AbortSignal;
   },
 ): Promise<WindGridResponse> {
@@ -132,13 +135,21 @@ export function fetchWindGrid(
     east: options.bounds.east.toFixed(4),
     rows: String(rows),
     columns: String(columns),
+    territory: options.territoryId,
   });
 
   return requestJson<WindGridResponse>(`/api/wind-grid?${query.toString()}`, options.signal);
 }
 
-export function fetchCloudForecast(signal?: AbortSignal): Promise<CloudForecastResponse> {
-  return requestJson<CloudForecastResponse>("/api/cloud-forecast", signal);
+export function fetchCloudForecast(
+  territoryId: string,
+  signal?: AbortSignal,
+): Promise<CloudForecastResponse> {
+  const query = new URLSearchParams({ territory: territoryId });
+  return requestJson<CloudForecastResponse>(
+    `/api/cloud-forecast?${query.toString()}`,
+    signal,
+  );
 }
 
 export function fetchWindHistory(
@@ -146,6 +157,7 @@ export function fetchWindHistory(
     latitude: number;
     longitude: number;
     startAt: string;
+    territoryId: string;
     signal?: AbortSignal;
   },
 ): Promise<WindHistoryResponse> {
@@ -153,6 +165,7 @@ export function fetchWindHistory(
     lat: String(options.latitude),
     lon: String(options.longitude),
     start: options.startAt,
+    territory: options.territoryId,
   });
 
   return requestJson<WindHistoryResponse>(`/api/wind-history?${query.toString()}`, options.signal);
@@ -161,6 +174,7 @@ export function fetchWindHistory(
 export function createAlertSubscription(options: {
   expoPushToken: string;
   watchArea: WatchArea;
+  entitlementToken?: string | null;
 }): Promise<CreateAlertSubscriptionResponse> {
   return mutationJson<CreateAlertSubscriptionResponse>("/api/alerts/subscriptions", {
     method: "POST",
@@ -173,6 +187,7 @@ export function updateAlertSubscription(options: {
   secret: string;
   expoPushToken?: string;
   watchArea?: WatchArea;
+  entitlementToken?: string | null;
 }): Promise<UpdateAlertSubscriptionResponse> {
   return mutationJson<UpdateAlertSubscriptionResponse>(
     `/api/alerts/subscriptions/${encodeURIComponent(options.id)}`,
@@ -182,6 +197,9 @@ export function updateAlertSubscription(options: {
       body: {
         ...(options.expoPushToken ? { expoPushToken: options.expoPushToken } : {}),
         ...(options.watchArea ? { watchArea: options.watchArea } : {}),
+        ...(options.entitlementToken
+          ? { entitlementToken: options.entitlementToken }
+          : {}),
       },
     },
   );

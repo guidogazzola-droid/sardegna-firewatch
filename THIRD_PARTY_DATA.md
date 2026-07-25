@@ -1,6 +1,6 @@
 # Sardinia FireWatch — third-party data and service register
 
-_Last reviewed: 2026-07-24_
+_Last reviewed: 2026-07-25_
 
 This document is an engineering compliance register, not a legal opinion. Every public release must re-check the linked official terms because providers can change licences, prices, quotas, attribution rules, and available products.
 
@@ -12,9 +12,10 @@ A production App Store build must not be released unless all entries marked **BL
 |---|---|---:|---|
 | NASA LANCE FIRMS | Active-fire and thermal-anomaly observations | ALLOWED WITH CONDITIONS | Use a valid FIRMS MAP_KEY, acknowledge NASA/FIRMS, preserve provenance, do not imply NASA endorsement, and respect transaction limits. |
 | Copernicus EMS / EFFIS | Hotspots, recent burned areas, fire-weather layers | ALLOWED WITH CONDITIONS | Attribute Copernicus/EFFIS and the European Union; keep the information-only disclaimer; verify the terms of each requested layer, including any third-party component. |
-| Open-Meteo weather API and data | Wind, cloud cover, weather history used in smoke-drift estimates | **BLOCKED FOR PAID RELEASE UNTIL CONFIGURED** | The public free API is restricted to non-commercial use. Before a paid App Store release, configure a commercial Open-Meteo endpoint/API key or a compliant self-hosted instance. Keep Open-Meteo and underlying-provider attribution and identify derived estimates as modified/derived data. |
+| Open-Meteo weather API and data | Wind, cloud cover, weather history used in smoke-drift estimates | ALLOWED WITH COMMERCIAL CONFIGURATION | The production backend is configured for the customer endpoint and requires a commercial API key. Keep Open-Meteo and underlying-provider attribution and identify derived estimates as modified/derived data. |
 | Apple MapKit / Apple Maps | Native satellite, hybrid, and street basemaps on iOS | ALLOWED WITH CONDITIONS | Use the system MapKit renderer, preserve Apple’s legal and attribution controls, and re-check the current Apple Developer agreements and Maps terms before release. |
 | react-native-maps | React Native bridge to Apple MapKit | ALLOWED WITH CONDITIONS | Preserve the library’s MIT licence notice in distributed software documentation and verify compatibility with the targeted Expo/React Native release. |
+| Natural Earth / world-atlas | Simplified country outlines used for territory selection and filtering | ALLOWED | Natural Earth data is public domain. State clearly that the operational outlines are not authoritative and do not express a position on disputed borders. |
 
 ## 1. NASA LANCE FIRMS
 
@@ -64,14 +65,17 @@ CEMS information is supplied without warranty and for information purposes. Sard
 - Terms: https://open-meteo.com/en/terms
 - Pricing and commercial API information: https://open-meteo.com/en/pricing
 
-**Important commercial restriction**
+**Commercial configuration**
 
-The public free API is offered for non-commercial use. A paid App Store app is a commercial use. Therefore production weather requests must use one of the following before release:
+The public free API is offered for non-commercial use. The production service
+therefore uses the paid customer endpoint and passes the API key only from the
+backend environment. A release must continue to verify one of the following:
 
 1. a paid Open-Meteo customer endpoint and API key under the selected plan; or
 2. a compliant self-hosted Open-Meteo deployment, including compliance with the server-code licence and all underlying data-provider attribution requirements.
 
-Development and internal TestFlight testing may use the public endpoint only while the project remains non-commercial and within the published limits.
+The release guard must reject a commercial build if the customer endpoint or
+API key is absent.
 
 **Derived information**
 
@@ -107,6 +111,14 @@ Derived outputs must retain enough provenance to identify:
 - limitations and uncertainty.
 
 The current smoke-drift track is explicitly an indicative project calculation based on wind at 10 m with a simplified drift factor. It must never be described as a prediction of fire spread or as an official plume-dispersion result.
+
+## 6. Territory boundaries
+
+Country outlines are generated from Natural Earth data distributed through
+world-atlas. They are simplified for display, API bounding and point filtering.
+They are not cadastral boundaries, legal determinations or statements on
+sovereignty. Product copy must call them operational map territories and should
+not claim official border accuracy.
 
 ## Release checklist
 

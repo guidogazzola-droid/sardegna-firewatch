@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "expo-router";
 import {
   ActivityIndicator,
   Pressable,
@@ -9,18 +10,16 @@ import {
 import MapView, {
   Circle,
   Marker,
+  Polygon,
   Polyline,
   type Region,
 } from "react-native-maps";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFireData } from "../../src/context/fire-data";
+import { useTerritory } from "../../src/context/territory";
 import { useWeatherLayers } from "../../src/hooks/use-weather-layers";
 import { fetchWindHistory } from "../../src/lib/api";
-import {
-  APP_DISPLAY_NAME,
-  SARDINIA_BOUNDS,
-  SARDINIA_CENTER,
-} from "../../src/lib/config";
+import { APP_DISPLAY_NAME } from "../../src/lib/config";
 import {
   confidenceLabel,
   formatAge,
@@ -29,6 +28,11 @@ import {
   severityLabel,
 } from "../../src/lib/format";
 import { BASE_MAPS, DEFAULT_BASE_MAP_ID, type BaseMapId } from "../../src/lib/map-styles";
+import {
+  DEFAULT_TERRITORY,
+  territoryPolygonOutlines,
+  territoryRegion,
+} from "../../src/lib/territories";
 import type {
   FireDetection,
   GeoBounds,
@@ -38,23 +42,18 @@ import { severityColors, spacing, useAppTheme } from "../../src/theme";
 
 const BASE_MAP_ORDER: BaseMapId[] = ["satellite", "topographic", "street"];
 
-const INITIAL_REGION: Region = {
-  latitude: SARDINIA_CENTER[1],
-  longitude: SARDINIA_CENTER[0],
-  latitudeDelta: SARDINIA_BOUNDS.north - SARDINIA_BOUNDS.south,
-  longitudeDelta: SARDINIA_BOUNDS.east - SARDINIA_BOUNDS.west,
-};
+const INITIAL_REGION: Region = territoryRegion(DEFAULT_TERRITORY);
 
-function clampRegion(region: Region): GeoBounds | null {
+function clampRegion(region: Region, territoryBounds: GeoBounds): GeoBounds | null {
   const west = region.longitude - region.longitudeDelta / 2;
   const south = region.latitude - region.latitudeDelta / 2;
   const east = region.longitude + region.longitudeDelta / 2;
   const north = region.latitude + region.latitudeDelta / 2;
   const clipped = {
-    west: Math.max(west, SARDINIA_BOUNDS.west),
-    south: Math.max(south, SARDINIA_BOUNDS.south),
-    east: Math.min(east, SARDINIA_BOUNDS.east),
-    north: Math.min(north, SARDINIA_BOUNDS.north),
+    west: Math.max(west, territoryBounds.west),
+    south: Math.max(south, territoryBounds.south),
+    east: Math.min(east, territoryBounds.east),
+    north: Math.min(north, territoryBounds.north),
   };
   return clipped.east > clipped.west && clipped.north > clipped.south ? clipped : null;
 }
@@ -66,6 +65,9 @@ function cloudOpacity(cover: number): string {
 
 export default function MapScreen() {
   const theme = useAppTheme();
+  const router = useRouter();
+  const { activeTerritory } = useTerritory();
+  const mapRef = useRef<MapView | null>(null);
   const windRefreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const historyController = useRef<AbortController | null>(null);
   const [baseMapId, setBaseMapId] = useState<BaseMapId>(DEFAULT_BASE_MAP_ID);
@@ -103,7 +105,12 @@ export default function MapScreen() {
     setCloudFrameIndex,
     toggleCloudPlayback,
     stopCloudPlayback,
-  } = useWeatherLayers();
+  } = useWeatherLayers(activeTerritory);
+
+  const territoryOutlines = useMemo(
+    () => territoryPolygonOutlines(activeTerritory),
+    [activeTerritory],
+  );
 
   const visibleFires = fires.slice(0, 100);
   const baseMap = BASE_MAPS[baseMapId];
@@ -137,14 +144,14 @@ export default function MapScreen() {
   const scheduleWindRefresh = useCallback(
     (region: Region) => {
       if (!windEnabled) return;
-      const bounds = clampRegion(region);
+      const bounds = clampRegion(region, activeTerritory.queryBounds);
       if (!bounds) return;
       if (windRefreshTimer.current) clearTimeout(windRefreshTimer.current);
       windRefreshTimer.current = setTimeout(() => {
         void loadWind(bounds);
       }, 450);
     },
-    [loadWind, windEnabled],
+    [activeTerritory.queryBounds, loadWind, windEnabled],
   );
 
   const selectBaseMap = useCallback((id: BaseMapId) => {
@@ -180,6 +187,7 @@ export default function MapScreen() {
         latitude: selectedFire.latitude,
         longitude: selectedFire.longitude,
         startAt: selectedFire.estimatedStartAt || selectedFire.observedAt,
+        territoryId: activeTerritory.id,
         signal: controller.signal,
       });
       if (historyController.current !== controller) return;
@@ -195,7 +203,15 @@ export default function MapScreen() {
     } finally {
       if (historyController.current === controller) setHistoryLoading(false);
     }
-  }, [historyLoading, selectedFire]);
+  }, [activeTerritory.id, historyLoading, selectedFire]);
+
+  useEffect(() => {
+    historyController.current?.abort();
+    setSelectedFire(null);
+    setHistory(null);
+    setHistoryError(null);
+    mapRef.current?.animateToRegion(territoryRegion(activeTerritory), 550);
+  }, [activeTerritory]);
 
   useEffect(
     () => () => {
@@ -209,7 +225,15 @@ export default function MapScreen() {
     <SafeAreaView style={[styles.screen, { backgroundColor: theme.background }]} edges={["top"]}>
       <View style={styles.header}>
         <View style={styles.headerText}>
-          <Text style={[styles.eyebrow, { color: theme.accent }]}>SARDEGNA</Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Scegli territorio"
+            onPress={() => router.push("/(tabs)/territories")}
+          >
+            <Text style={[styles.eyebrow, { color: theme.accent }]}>
+              {activeTerritory.name.toUpperCase()} ▾
+            </Text>
+          </Pressable>
           <Text style={[styles.title, { color: theme.text }]}>{APP_DISPLAY_NAME}</Text>
           <Text style={[styles.subtitle, { color: theme.textMuted }]}>Incendi, vento e nuvolosita in un'unica vista</Text>
         </View>
@@ -299,6 +323,7 @@ export default function MapScreen() {
 
       <View style={[styles.mapFrame, { borderColor: theme.border, backgroundColor: theme.surfaceMuted }]}>
         <MapView
+          ref={mapRef}
           style={styles.map}
           initialRegion={INITIAL_REGION}
           mapType={baseMap.mapType}
@@ -312,6 +337,18 @@ export default function MapScreen() {
           onMapReady={() => setIsMapReady(true)}
           onRegionChangeComplete={scheduleWindRefresh}
         >
+          {territoryOutlines.map((coordinates, index) => (
+            <Polygon
+              key={`territory-outline-${index}`}
+              coordinates={coordinates}
+              fillColor={`${theme.accent}08`}
+              strokeColor={`${theme.accent}aa`}
+              strokeWidth={2}
+              lineDashPattern={[8, 5]}
+              zIndex={2}
+            />
+          ))}
+
           {visibleClouds.map((sample, index) => (
             <Circle
               key={`cloud-${index}`}

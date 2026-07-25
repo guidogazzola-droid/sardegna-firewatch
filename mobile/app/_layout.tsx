@@ -5,6 +5,7 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { FireDataProvider } from "../src/context/fire-data";
+import { TerritoryProvider } from "../src/context/territory";
 import { useAppTheme } from "../src/theme";
 
 Notifications.setNotificationHandler({
@@ -22,15 +23,17 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <FireDataProvider>
-        <StatusBar style={statusBarStyle} />
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            contentStyle: { backgroundColor: theme.background },
-          }}
-        />
-      </FireDataProvider>
+      <TerritoryProvider>
+        <FireDataProvider>
+          <StatusBar style={statusBarStyle} />
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              contentStyle: { backgroundColor: theme.background },
+            }}
+          />
+        </FireDataProvider>
+      </TerritoryProvider>
     </SafeAreaProvider>
   );
 }

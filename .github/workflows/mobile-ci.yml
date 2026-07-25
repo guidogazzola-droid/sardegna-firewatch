@@ -5,6 +5,7 @@ on:
   pull_request:
     paths:
       - "mobile/**"
+      - "data/**"
       - ".github/workflows/mobile-ci.yml"
 
 permissions:

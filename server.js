@@ -7,12 +7,12 @@ import helmet from "helmet";
 import { AlertMonitor } from "./lib/alert-monitor.js";
 import { AlertStore } from "./lib/alert-store.js";
 import { isExpoPushToken, parseWatchArea } from "./lib/alerts.js";
+import { verifyTerritoryEntitlement } from "./lib/app-store.js";
 import { TtlCache } from "./lib/cache.js";
 import {
   DEFAULT_CACHE_TTL_MS,
   DEFAULT_REFRESH_SECONDS,
   FIRMS_SOURCES,
-  SARDINIA_BBOX,
 } from "./lib/config.js";
 import { fetchFirmsFires } from "./lib/firms.js";
 import { fetchCloudForecast } from "./lib/cloud.js";
@@ -26,6 +26,13 @@ import {
   fetchCurrentWindGrid,
   fetchWindHistory,
 } from "./lib/wind.js";
+import {
+  DEFAULT_TERRITORY_ID,
+  getTerritory,
+  isPointInTerritory,
+  listTerritories,
+  publicTerritory,
+} from "./lib/territories.js";
 
 dotenv.config();
 
@@ -51,14 +58,38 @@ const alertMonitor = new AlertMonitor({
   store: alertStore,
   accessToken: expoAccessToken,
   intervalMs: alertMonitorIntervalMs,
-  fetchFires: async () => {
+  fetchFires: async (subscriptions = []) => {
     if (!firmsMapKey) return [];
-    const result = await fetchFirmsFires({
-      mapKey: firmsMapKey,
-      sources: FIRMS_SOURCES.viirs,
-      days: 1,
-    });
-    return result.fires;
+    const territoryIds = [
+      ...new Set(
+        subscriptions.map(
+          (subscription) =>
+            subscription.watchArea?.territoryId || DEFAULT_TERRITORY_ID,
+        ),
+      ),
+    ];
+    const results = await Promise.all(
+      territoryIds.map(async (territoryId) => {
+        const territory = getTerritory(territoryId);
+        if (!territory) return [];
+        const cacheKey = `alert-fires:${territory.id}`;
+        const cached = cache.get(cacheKey);
+        if (cached) return cached;
+        const result = await fetchFirmsFires({
+          mapKey: firmsMapKey,
+          sources: FIRMS_SOURCES.viirs,
+          days: 1,
+          territory,
+        });
+        cache.set(cacheKey, result.fires, cacheTtlMs);
+        return result.fires;
+      }),
+    );
+    return [
+      ...new Map(
+        results.flat().map((fire) => [fire.id, fire]),
+      ).values(),
+    ];
   },
 });
 const alertMutationWindows = new Map();
@@ -113,18 +144,38 @@ function alertServiceUnavailable(response) {
   });
 }
 
+function requestedTerritory(request) {
+  return getTerritory(request.query.territory || DEFAULT_TERRITORY_ID);
+}
+
+async function hasWatchAreaEntitlement(request, watchArea) {
+  const territory = getTerritory(watchArea?.territoryId);
+  if (!territory) return false;
+  const entitlement = await verifyTerritoryEntitlement({
+    territory,
+    purchaseToken: request.body?.entitlementToken,
+  });
+  return entitlement.valid;
+}
+
 app.get("/api/health", (_request, response) => {
   response.json({ ok: true, now: new Date().toISOString() });
 });
 
 app.get("/api/status", (_request, response) => {
+  const sardinia = getTerritory();
   response.set("Cache-Control", "no-store");
   response.json({
     ok: true,
     mode: firmsMapKey ? "full" : "effis-only",
     firmsConfigured: Boolean(firmsMapKey),
     refreshSeconds: DEFAULT_REFRESH_SECONDS,
-    bbox: SARDINIA_BBOX,
+    bbox: sardinia.bounds,
+    territories: {
+      available: listTerritories().length,
+      freeTerritoryId: DEFAULT_TERRITORY_ID,
+      inAppPurchases: true,
+    },
     weatherService,
     alerts: {
       available: Boolean(firmsMapKey),
@@ -143,6 +194,31 @@ app.get("/api/status", (_request, response) => {
   });
 });
 
+app.get("/api/territories", (_request, response) => {
+  response.set("Cache-Control", "public, max-age=3600");
+  response.json({
+    ok: true,
+    territories: listTerritories().map((territory) =>
+      publicTerritory(territory),
+    ),
+  });
+});
+
+app.get("/api/territories/:territoryId", (request, response) => {
+  const territory = getTerritory(request.params.territoryId);
+  if (!territory) {
+    return response.status(404).json({
+      ok: false,
+      error: "Territorio non supportato.",
+    });
+  }
+  response.set("Cache-Control", "public, max-age=86400");
+  return response.json({
+    ok: true,
+    territory: publicTerritory(territory, { includeGeometry: true }),
+  });
+});
+
 app.post(
   "/api/alerts/subscriptions",
   alertMutationRateLimit,
@@ -154,6 +230,12 @@ app.post(
       return response.status(400).json({
         ok: false,
         error: "Token di notifica o zona monitorata non validi.",
+      });
+    }
+    if (!(await hasWatchAreaEntitlement(request, watchArea))) {
+      return response.status(403).json({
+        ok: false,
+        error: "Il territorio selezionato non risulta acquistato.",
       });
     }
     const created = await alertStore.createSubscription({ expoPushToken, watchArea });
@@ -175,6 +257,12 @@ app.patch(
       : null;
     if (!secret || (expoPushToken && !isExpoPushToken(expoPushToken)) || (!expoPushToken && !watchArea)) {
       return response.status(400).json({ ok: false, error: "Aggiornamento non valido." });
+    }
+    if (watchArea && !(await hasWatchAreaEntitlement(request, watchArea))) {
+      return response.status(403).json({
+        ok: false,
+        error: "Il territorio selezionato non risulta acquistato.",
+      });
     }
     const subscription = await alertStore.updateSubscription(
       request.params.subscriptionId,
@@ -260,6 +348,13 @@ app.post(
 
 app.get("/api/fires", async (request, response) => {
   response.set("Cache-Control", "no-store");
+  const territory = requestedTerritory(request);
+  if (!territory) {
+    return response.status(404).json({
+      ok: false,
+      error: "Territorio non supportato.",
+    });
+  }
 
   const requestedDays = Number.parseInt(String(request.query.days || "1"), 10);
   const days = Number.isInteger(requestedDays) ? Math.min(5, Math.max(1, requestedDays)) : 1;
@@ -273,6 +368,7 @@ app.get("/api/fires", async (request, response) => {
       configured: false,
       generatedAt: new Date().toISOString(),
       refreshSeconds: DEFAULT_REFRESH_SECONDS,
+      territory: publicTerritory(territory),
       fires: [],
       stats: {
         total: 0,
@@ -288,19 +384,25 @@ app.get("/api/fires", async (request, response) => {
     });
   }
 
-  const cacheKey = `fires:${sourceGroup}:${days}`;
+  const cacheKey = `fires:${territory.id}:${sourceGroup}:${days}`;
   const cached = cache.get(cacheKey);
   if (cached) return response.json({ ...cached, cached: true });
 
   try {
-    const result = await fetchFirmsFires({ mapKey: firmsMapKey, sources, days });
+    const result = await fetchFirmsFires({
+      mapKey: firmsMapKey,
+      sources,
+      days,
+      territory,
+    });
     const payload = {
       ok: true,
       mode: "full",
       configured: true,
       generatedAt: new Date().toISOString(),
       refreshSeconds: DEFAULT_REFRESH_SECONDS,
-      query: { days, sourceGroup, sources },
+      territory: publicTerritory(territory),
+      query: { days, sourceGroup, sources, territoryId: territory.id },
       ...result,
     };
     cache.set(cacheKey, payload, cacheTtlMs);
@@ -317,23 +419,19 @@ app.get("/api/fires", async (request, response) => {
 });
 
 app.get("/api/weather", async (request, response) => {
+  const territory = requestedTerritory(request);
   const latitude = Number.parseFloat(String(request.query.lat || ""));
   const longitude = Number.parseFloat(String(request.query.lon || ""));
 
-  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+  if (!territory || !Number.isFinite(latitude) || !Number.isFinite(longitude)) {
     return response.status(400).json({ ok: false, error: "Coordinate non valide." });
   }
 
-  const insideExtendedBox =
-    latitude >= SARDINIA_BBOX.south - 0.5 &&
-    latitude <= SARDINIA_BBOX.north + 0.5 &&
-    longitude >= SARDINIA_BBOX.west - 0.5 &&
-    longitude <= SARDINIA_BBOX.east + 0.5;
-  if (!insideExtendedBox) {
+  if (!isPointInTerritory(territory, latitude, longitude)) {
     return response.status(400).json({ ok: false, error: "Coordinate fuori dall'area supportata." });
   }
 
-  const cacheKey = `weather:${latitude.toFixed(2)}:${longitude.toFixed(2)}`;
+  const cacheKey = `weather:${territory.id}:${latitude.toFixed(2)}:${longitude.toFixed(2)}`;
   const cached = cache.get(cacheKey);
   if (cached) return response.json({ ...cached, cached: true });
 
@@ -378,6 +476,13 @@ app.get("/api/weather", async (request, response) => {
 
 app.get("/api/wind-grid", async (request, response) => {
   response.set("Cache-Control", "no-store");
+  const territory = requestedTerritory(request);
+  if (!territory) {
+    return response.status(404).json({
+      ok: false,
+      error: "Territorio non supportato.",
+    });
+  }
   const requestedBounds = {
     south: Number.parseFloat(String(request.query.south || "")),
     west: Number.parseFloat(String(request.query.west || "")),
@@ -393,10 +498,10 @@ app.get("/api/wind-grid", async (request, response) => {
   }
 
   const bounds = {
-    south: Math.max(requestedBounds.south, SARDINIA_BBOX.south),
-    west: Math.max(requestedBounds.west, SARDINIA_BBOX.west),
-    north: Math.min(requestedBounds.north, SARDINIA_BBOX.north),
-    east: Math.min(requestedBounds.east, SARDINIA_BBOX.east),
+    south: Math.max(requestedBounds.south, territory.queryBounds.south),
+    west: Math.max(requestedBounds.west, territory.queryBounds.west),
+    north: Math.min(requestedBounds.north, territory.queryBounds.north),
+    east: Math.min(requestedBounds.east, territory.queryBounds.east),
   };
   if (bounds.north <= bounds.south || bounds.east <= bounds.west) {
     return response.json({ ok: true, generatedAt: new Date().toISOString(), samples: [] });
@@ -404,12 +509,25 @@ app.get("/api/wind-grid", async (request, response) => {
 
   const rows = Math.min(5, Math.max(2, Number.parseInt(String(request.query.rows || "4"), 10) || 4));
   const columns = Math.min(6, Math.max(2, Number.parseInt(String(request.query.columns || "5"), 10) || 5));
-  const cacheKey = `wind-grid:${Object.values(bounds).map((value) => value.toFixed(2)).join(":")}:${rows}:${columns}`;
+  const cacheKey = `wind-grid:${territory.id}:${Object.values(bounds).map((value) => value.toFixed(2)).join(":")}:${rows}:${columns}`;
   const cached = cache.get(cacheKey);
   if (cached) return response.json({ ...cached, cached: true });
 
   try {
-    const points = buildWindGridPoints(bounds, rows, columns);
+    const points = buildWindGridPoints(bounds, rows, columns).filter((point) =>
+      isPointInTerritory(territory, point.latitude, point.longitude),
+    );
+    if (!points.length) {
+      return response.json({
+        ok: true,
+        generatedAt: new Date().toISOString(),
+        source: "Open-Meteo",
+        sourceMode: weatherService.mode,
+        units: { speed: "km/h", direction: "°" },
+        bounds,
+        samples: [],
+      });
+    }
     const samples = await fetchCurrentWindGrid({ points });
     const payload = {
       ok: true,
@@ -432,14 +550,36 @@ app.get("/api/wind-grid", async (request, response) => {
   }
 });
 
-app.get("/api/cloud-forecast", async (_request, response) => {
+app.get("/api/cloud-forecast", async (request, response) => {
   response.set("Cache-Control", "no-store");
-  const cacheKey = "cloud-forecast:sardinia:5x5:25h";
+  const territory = requestedTerritory(request);
+  if (!territory) {
+    return response.status(404).json({
+      ok: false,
+      error: "Territorio non supportato.",
+    });
+  }
+  const cacheKey = `cloud-forecast:${territory.id}:5x5:25h`;
   const cached = cache.get(cacheKey);
   if (cached) return response.json({ ...cached, cached: true });
 
   try {
-    const points = buildWindGridPoints(SARDINIA_BBOX, 5, 5);
+    const points = buildWindGridPoints(territory.queryBounds, 5, 5).filter(
+      (point) =>
+        isPointInTerritory(territory, point.latitude, point.longitude),
+    );
+    if (!points.length) {
+      return response.json({
+        ok: true,
+        generatedAt: new Date().toISOString(),
+        source: "Open-Meteo",
+        sourceMode: weatherService.mode,
+        methodology:
+          "Copertura nuvolosa oraria modellata; non e un'immagine satellitare osservata.",
+        bounds: territory.queryBounds,
+        frames: [],
+      });
+    }
     const frames = await fetchCloudForecast({ points, hours: 25 });
     const payload = {
       ok: true,
@@ -447,7 +587,7 @@ app.get("/api/cloud-forecast", async (_request, response) => {
       source: "Open-Meteo",
       sourceMode: weatherService.mode,
       methodology: "Copertura nuvolosa oraria modellata; non e un'immagine satellitare osservata.",
-      bounds: SARDINIA_BBOX,
+      bounds: territory.queryBounds,
       frames,
     };
     cache.set(cacheKey, payload, 20 * 60_000);
@@ -464,24 +604,25 @@ app.get("/api/cloud-forecast", async (_request, response) => {
 
 app.get("/api/wind-history", async (request, response) => {
   response.set("Cache-Control", "no-store");
+  const territory = requestedTerritory(request);
   const latitude = Number.parseFloat(String(request.query.lat || ""));
   const longitude = Number.parseFloat(String(request.query.lon || ""));
   const startAt = String(request.query.start || "").trim();
 
-  if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || Number.isNaN(new Date(startAt).getTime())) {
+  if (
+    !territory ||
+    !Number.isFinite(latitude) ||
+    !Number.isFinite(longitude) ||
+    Number.isNaN(new Date(startAt).getTime())
+  ) {
     return response.status(400).json({ ok: false, error: "Coordinate o data iniziale non valide." });
   }
 
-  const insideExtendedBox =
-    latitude >= SARDINIA_BBOX.south - 0.5 &&
-    latitude <= SARDINIA_BBOX.north + 0.5 &&
-    longitude >= SARDINIA_BBOX.west - 0.5 &&
-    longitude <= SARDINIA_BBOX.east + 0.5;
-  if (!insideExtendedBox) {
+  if (!isPointInTerritory(territory, latitude, longitude)) {
     return response.status(400).json({ ok: false, error: "Coordinate fuori dall'area supportata." });
   }
 
-  const cacheKey = `wind:${latitude.toFixed(2)}:${longitude.toFixed(2)}:${startAt.slice(0, 13)}`;
+  const cacheKey = `wind:${territory.id}:${latitude.toFixed(2)}:${longitude.toFixed(2)}:${startAt.slice(0, 13)}`;
   const cached = cache.get(cacheKey);
   if (cached) return response.json({ ...cached, cached: true });
 

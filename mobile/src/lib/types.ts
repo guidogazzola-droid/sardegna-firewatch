@@ -8,6 +8,19 @@ export interface GeoBounds {
   north: number;
 }
 
+export interface TerritorySummary {
+  id: string;
+  countryCode: string;
+  name: string;
+  free: boolean;
+  productId: string | null;
+  bounds: GeoBounds;
+  center: {
+    latitude: number;
+    longitude: number;
+  };
+}
+
 export interface FireDetection {
   id: string;
   latitude: number;
@@ -51,6 +64,7 @@ export interface FireFeedResponse {
   configured: boolean;
   generatedAt: string;
   refreshSeconds: number;
+  territory?: TerritorySummary;
   fires: FireDetection[];
   stats: FireFeedStats;
   sourceStatus: SourceStatus[];
@@ -162,6 +176,11 @@ export interface SystemStatusResponse {
   firmsConfigured: boolean;
   refreshSeconds: number;
   bbox: GeoBounds;
+  territories?: {
+    available: number;
+    freeTerritoryId: string;
+    inAppPurchases: boolean;
+  };
   weatherService?: WeatherServiceStatus;
   alerts?: {
     available: boolean;
@@ -181,6 +200,7 @@ export interface SystemStatusResponse {
 
 export interface WatchArea {
   id: "primary";
+  territoryId: string;
   name: string;
   latitude: number;
   longitude: number;
