@@ -254,7 +254,7 @@ const manifest = [
     .filter((territory) => !territory.free)
     .map(
       (territory) =>
-        `"Sabetta Piro — ${territory.name}",${territory.productId},non-consumable,CHF 5.00`,
+        `"SabettaPiro — ${territory.name}",${territory.productId},non-consumable,CHF 5.00`,
     ),
 ].join("\n");
 writeFileSync(resolve(rootDir, "data/app-store-products.csv"), `${manifest}\n`);

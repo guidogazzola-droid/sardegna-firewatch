@@ -1,9 +1,9 @@
 {
   "ios": {
-    "CFBundleDisplayName": "Sabetta Piro",
-    "NSLocationWhenInUseUsageDescription": "Sabetta Piro uses your location only while you use the app, to show nearby detections and create monitored areas."
+    "CFBundleDisplayName": "SabettaPiro",
+    "NSLocationWhenInUseUsageDescription": "SabettaPiro uses your location only while you use the app, to show nearby detections and create monitored areas."
   },
   "android": {
-    "app_name": "Sabetta Piro"
+    "app_name": "SabettaPiro"
   }
 }

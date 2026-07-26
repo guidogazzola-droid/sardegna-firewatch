@@ -9,7 +9,7 @@ function configuredText(value: string | undefined, fallback: string): string {
 
 export const APP_DISPLAY_NAME = configuredText(
   process.env.EXPO_PUBLIC_APP_DISPLAY_NAME,
-  "Sabetta Piro \u2014 Wildfire Alerts",
+  "SabettaPiro \u2014 Wildfire Alerts",
 );
 
 export const APP_VERSION = "0.3.0";

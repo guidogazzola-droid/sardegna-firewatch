@@ -17,7 +17,7 @@ const easProject = JSON.parse(
 const EAS_PROJECT_ID = easProject.projectId;
 const APP_DISPLAY_NAME = configuredText(
   process.env.EXPO_PUBLIC_APP_DISPLAY_NAME,
-  "Sabetta Piro \u2014 Wildfire Alerts",
+  "SabettaPiro \u2014 Wildfire Alerts",
 );
 const API_BASE_URL =
   process.env.EXPO_PUBLIC_API_BASE_URL ?? "https://sardegna-firewatch.onrender.com";
