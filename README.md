@@ -1,4 +1,4 @@
-# Sabetta Piro / Sardegna FireWatch
+# SabettaPiro / Sardegna FireWatch
 
 Backend, dashboard web e applicazione iOS per osservare **hotspot
 satellitari, vento, nuvolosita e avvisi di prossimita**. La Sardegna resta il

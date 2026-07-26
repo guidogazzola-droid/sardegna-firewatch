@@ -105,7 +105,7 @@ const it = {
   "settings.sardiniaBulletin": "Bollettino Regione Sardegna",
   "settings.privacySupport": "Privacy e assistenza",
   "settings.privacy": "Informativa privacy",
-  "settings.support": "Supporto Sabetta Piro",
+  "settings.support": "Supporto SabettaPiro",
   "settings.purchases": "Acquisti nell’app",
   "settings.purchaseBody":
     "La Sardegna è gratuita. Ogni Paese aggiuntivo è un acquisto non consumabile separato, senza abbonamento.",
@@ -124,7 +124,7 @@ const it = {
   "territories.connecting": "Collegamento ad App Store…",
   "territories.restore": "Ripristina acquisti",
   "territories.footer":
-    "Gli sblocchi sono acquisti in-app non consumabili gestiti da Apple. Non richiediamo un account Sabetta Piro.",
+    "Gli sblocchi sono acquisti in-app non consumabili gestiti da Apple. Non richiediamo un account SabettaPiro.",
   "territories.selected": "Selezionato",
   "territories.inUse": "In uso",
   "territories.open": "Apri",
@@ -182,7 +182,7 @@ const it = {
     "Notifiche non autorizzate. Puoi abilitarle nelle impostazioni di iOS.",
   "push.projectMissing": "Identificativo EAS non disponibile in questa build.",
   "errors.unreachableApp":
-    "Impossibile raggiungere Sabetta Piro. Controlla la connessione e riprova.",
+    "Impossibile raggiungere SabettaPiro. Controlla la connessione e riprova.",
   "errors.invalidResponse": "Il servizio ha restituito una risposta non valida.",
   "errors.serviceUnavailable": "Il servizio è temporaneamente non disponibile.",
   "errors.notificationsUnreachable":
@@ -314,7 +314,7 @@ const en: Record<TranslationKey, string> = {
   "settings.sardiniaBulletin": "Sardinia Region bulletin",
   "settings.privacySupport": "Privacy and support",
   "settings.privacy": "Privacy policy",
-  "settings.support": "Sabetta Piro support",
+  "settings.support": "SabettaPiro support",
   "settings.purchases": "In-app purchases",
   "settings.purchaseBody":
     "Sardinia is free. Each additional country is a separate non-consumable purchase with no subscription.",
@@ -333,7 +333,7 @@ const en: Record<TranslationKey, string> = {
   "territories.connecting": "Connecting to the App Store…",
   "territories.restore": "Restore purchases",
   "territories.footer":
-    "Unlocks are non-consumable in-app purchases managed by Apple. No Sabetta Piro account is required.",
+    "Unlocks are non-consumable in-app purchases managed by Apple. No SabettaPiro account is required.",
   "territories.selected": "Selected",
   "territories.inUse": "In use",
   "territories.open": "Open",
@@ -390,7 +390,7 @@ const en: Record<TranslationKey, string> = {
     "Notifications are not authorised. You can enable them in iOS Settings.",
   "push.projectMissing": "The EAS identifier is unavailable in this build.",
   "errors.unreachableApp":
-    "Unable to reach Sabetta Piro. Check your connection and try again.",
+    "Unable to reach SabettaPiro. Check your connection and try again.",
   "errors.invalidResponse": "The service returned an invalid response.",
   "errors.serviceUnavailable": "The service is temporarily unavailable.",
   "errors.notificationsUnreachable": "Unable to reach the notification service.",
@@ -521,7 +521,7 @@ const fr: Record<TranslationKey, string> = {
   "settings.sardiniaBulletin": "Bulletin de la Région Sardaigne",
   "settings.privacySupport": "Confidentialité et assistance",
   "settings.privacy": "Politique de confidentialité",
-  "settings.support": "Assistance Sabetta Piro",
+  "settings.support": "Assistance SabettaPiro",
   "settings.purchases": "Achats intégrés",
   "settings.purchaseBody":
     "La Sardaigne est gratuite. Chaque pays supplémentaire est un achat non consommable distinct, sans abonnement.",
@@ -540,7 +540,7 @@ const fr: Record<TranslationKey, string> = {
   "territories.connecting": "Connexion à l’App Store…",
   "territories.restore": "Restaurer les achats",
   "territories.footer":
-    "Les déblocages sont des achats intégrés non consommables gérés par Apple. Aucun compte Sabetta Piro n’est requis.",
+    "Les déblocages sont des achats intégrés non consommables gérés par Apple. Aucun compte SabettaPiro n’est requis.",
   "territories.selected": "Sélectionné",
   "territories.inUse": "Actif",
   "territories.open": "Ouvrir",
@@ -599,7 +599,7 @@ const fr: Record<TranslationKey, string> = {
     "Les notifications ne sont pas autorisées. Vous pouvez les activer dans les réglages iOS.",
   "push.projectMissing": "L’identifiant EAS est indisponible dans cette version.",
   "errors.unreachableApp":
-    "Impossible de joindre Sabetta Piro. Vérifiez votre connexion et réessayez.",
+    "Impossible de joindre SabettaPiro. Vérifiez votre connexion et réessayez.",
   "errors.invalidResponse": "Le service a renvoyé une réponse non valide.",
   "errors.serviceUnavailable": "Le service est temporairement indisponible.",
   "errors.notificationsUnreachable":
@@ -731,7 +731,7 @@ const de: Record<TranslationKey, string> = {
   "settings.sardiniaBulletin": "Bulletin der Region Sardinien",
   "settings.privacySupport": "Datenschutz und Hilfe",
   "settings.privacy": "Datenschutzerklärung",
-  "settings.support": "Sabetta-Piro-Support",
+  "settings.support": "SabettaPiro-Support",
   "settings.purchases": "In-App-Käufe",
   "settings.purchaseBody":
     "Sardinien ist kostenlos. Jedes zusätzliche Land ist ein separater, nicht verbrauchbarer Kauf ohne Abonnement.",
@@ -750,7 +750,7 @@ const de: Record<TranslationKey, string> = {
   "territories.connecting": "Verbindung zum App Store…",
   "territories.restore": "Käufe wiederherstellen",
   "territories.footer":
-    "Freischaltungen sind nicht verbrauchbare In-App-Käufe von Apple. Ein Sabetta-Piro-Konto ist nicht erforderlich.",
+    "Freischaltungen sind nicht verbrauchbare In-App-Käufe von Apple. Ein SabettaPiro-Konto ist nicht erforderlich.",
   "territories.selected": "Ausgewählt",
   "territories.inUse": "Aktiv",
   "territories.open": "Öffnen",
@@ -809,7 +809,7 @@ const de: Record<TranslationKey, string> = {
     "Benachrichtigungen sind nicht erlaubt. Sie können sie in den iOS-Einstellungen aktivieren.",
   "push.projectMissing": "Die EAS-Kennung ist in dieser Version nicht verfügbar.",
   "errors.unreachableApp":
-    "Sabetta Piro ist nicht erreichbar. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.",
+    "SabettaPiro ist nicht erreichbar. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.",
   "errors.invalidResponse": "Der Dienst hat eine ungültige Antwort geliefert.",
   "errors.serviceUnavailable": "Der Dienst ist vorübergehend nicht verfügbar.",
   "errors.notificationsUnreachable":

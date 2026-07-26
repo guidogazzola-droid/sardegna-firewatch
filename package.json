@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Sabetta Piro: mappe, dati e avvisi quasi in tempo reale sugli incendi in Sardegna e nei territori europei.",
+  "description": "SabettaPiro: mappe, dati e avvisi quasi in tempo reale sugli incendi in Sardegna e nei territori europei.",
   "engines": {
     "node": ">=24.0.0 <25.0.0"
   },

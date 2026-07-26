@@ -1,6 +1,6 @@
 {
-  "name": "Sabetta Piro - Sardegna",
-  "short_name": "Sabetta Piro",
+  "name": "SabettaPiro - Sardegna",
+  "short_name": "SabettaPiro",
   "description": "Monitoraggio satellitare quasi in tempo reale degli incendi in Sardegna.",
   "start_url": "/",
   "display": "standalone",

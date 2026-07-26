@@ -1,10 +1,10 @@
-const CACHE_NAME = "sardegna-firewatch-v5";
+const CACHE_NAME = "sardegna-firewatch-v6";
 const APP_SHELL = [
   "/",
   "/styles.css",
   "/app.js",
   "/favicon.svg?v=2",
-  "/manifest.webmanifest?v=2",
+  "/manifest.webmanifest?v=3",
   "/icons/icon-192.png?v=2",
   "/icons/icon-512.png?v=2",
 ];
