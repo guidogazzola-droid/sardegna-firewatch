@@ -120,7 +120,7 @@ const it = {
     "La Sardegna è inclusa. Ogni Paese si acquista una sola volta e resta disponibile sul tuo Apple ID.",
   "territories.modelTitle": "Sardegna gratis · Paesi da CHF 5",
   "territories.modelBody":
-    "Il prezzo effettivo è quello mostrato da App Store nella valuta del Paese dell’utente. Gli acquisti non sono abbonamenti.",
+    "L’elenco mostra solo i Paesi disponibili su App Store. Il prezzo effettivo è quello nella valuta dell’utente; gli acquisti non sono abbonamenti.",
   "territories.connecting": "Collegamento ad App Store…",
   "territories.restore": "Ripristina acquisti",
   "territories.footer":
@@ -131,6 +131,9 @@ const it = {
   "territories.selectHint": "Seleziona %{territory} come territorio attivo",
   "territories.purchaseHint":
     "Acquista l’accesso permanente a %{territory}",
+  "territories.unavailableHint":
+    "%{territory} sarà acquistabile quando il prodotto sarà disponibile su App Store",
+  "territories.comingSoon": "In arrivo",
   "territories.included": "Inclusa · accesso completo",
   "territories.purchased": "Acquistata · accesso permanente",
   "territories.features": "Mappa, rilevazioni, meteo e avvisi",
@@ -329,7 +332,7 @@ const en: Record<TranslationKey, string> = {
     "Sardinia is included. Each country is purchased once and remains available with your Apple ID.",
   "territories.modelTitle": "Free Sardinia · Countries from CHF 5",
   "territories.modelBody":
-    "The actual price is shown by the App Store in the user’s store currency. Purchases are not subscriptions.",
+    "Only countries available on the App Store are listed. The actual price uses the user’s store currency; purchases are not subscriptions.",
   "territories.connecting": "Connecting to the App Store…",
   "territories.restore": "Restore purchases",
   "territories.footer":
@@ -339,6 +342,9 @@ const en: Record<TranslationKey, string> = {
   "territories.open": "Open",
   "territories.selectHint": "Select %{territory} as the active territory",
   "territories.purchaseHint": "Purchase permanent access to %{territory}",
+  "territories.unavailableHint":
+    "%{territory} can be purchased when the product becomes available on the App Store",
+  "territories.comingSoon": "Coming soon",
   "territories.included": "Included · full access",
   "territories.purchased": "Purchased · permanent access",
   "territories.features": "Map, detections, weather and alerts",
@@ -536,7 +542,7 @@ const fr: Record<TranslationKey, string> = {
     "La Sardaigne est incluse. Chaque pays s’achète une seule fois et reste disponible avec votre identifiant Apple.",
   "territories.modelTitle": "Sardaigne gratuite · Pays dès CHF 5",
   "territories.modelBody":
-    "Le prix réel est affiché par l’App Store dans la devise du pays de l’utilisateur. Il ne s’agit pas d’abonnements.",
+    "Seuls les pays disponibles sur l’App Store sont affichés. Le prix utilise la devise de l’utilisateur ; il ne s’agit pas d’abonnements.",
   "territories.connecting": "Connexion à l’App Store…",
   "territories.restore": "Restaurer les achats",
   "territories.footer":
@@ -546,6 +552,9 @@ const fr: Record<TranslationKey, string> = {
   "territories.open": "Ouvrir",
   "territories.selectHint": "Sélectionner %{territory} comme territoire actif",
   "territories.purchaseHint": "Acheter l’accès permanent à %{territory}",
+  "territories.unavailableHint":
+    "%{territory} pourra être acheté lorsque le produit sera disponible sur l’App Store",
+  "territories.comingSoon": "Bientôt disponible",
   "territories.included": "Incluse · accès complet",
   "territories.purchased": "Acheté · accès permanent",
   "territories.features": "Carte, détections, météo et alertes",
@@ -746,7 +755,7 @@ const de: Record<TranslationKey, string> = {
     "Sardinien ist enthalten. Jedes Land wird einmal gekauft und bleibt mit Ihrer Apple-ID verfügbar.",
   "territories.modelTitle": "Sardinien kostenlos · Länder ab CHF 5",
   "territories.modelBody":
-    "Der tatsächliche Preis wird im App Store in der Währung des Nutzer-Stores angezeigt. Die Käufe sind keine Abonnements.",
+    "Es werden nur im App Store verfügbare Länder angezeigt. Der Preis nutzt die Store-Währung des Nutzers; die Käufe sind keine Abonnements.",
   "territories.connecting": "Verbindung zum App Store…",
   "territories.restore": "Käufe wiederherstellen",
   "territories.footer":
@@ -756,6 +765,9 @@ const de: Record<TranslationKey, string> = {
   "territories.open": "Öffnen",
   "territories.selectHint": "%{territory} als aktives Gebiet auswählen",
   "territories.purchaseHint": "Dauerhaften Zugriff auf %{territory} kaufen",
+  "territories.unavailableHint":
+    "%{territory} kann gekauft werden, sobald das Produkt im App Store verfügbar ist",
+  "territories.comingSoon": "Demnächst",
   "territories.included": "Enthalten · vollständiger Zugriff",
   "territories.purchased": "Gekauft · dauerhafter Zugriff",
   "territories.features": "Karte, Erfassungen, Wetter und Warnungen",

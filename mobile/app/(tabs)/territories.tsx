@@ -24,6 +24,7 @@ export default function TerritoriesScreen() {
     storeError,
     storeMessage,
     isUnlocked,
+    isPurchasable,
     displayPrice,
     selectTerritory,
     purchaseTerritory,
@@ -91,6 +92,7 @@ export default function TerritoriesScreen() {
             territory={item}
             selected={activeTerritory.id === item.id}
             unlocked={isUnlocked(item)}
+            purchasable={isPurchasable(item)}
             price={displayPrice(item)}
             busy={isPurchasing}
             connected={connected}
@@ -138,6 +140,7 @@ function TerritoryRow({
   territory,
   selected,
   unlocked,
+  purchasable,
   price,
   busy,
   connected,
@@ -146,6 +149,7 @@ function TerritoryRow({
   territory: Territory;
   selected: boolean;
   unlocked: boolean;
+  purchasable: boolean;
   price: string;
   busy: boolean;
   connected: boolean;
@@ -158,7 +162,9 @@ function TerritoryRow({
     ? t("territories.inUse")
     : unlocked
       ? t("territories.open")
-      : price;
+      : purchasable
+        ? price
+        : t("territories.comingSoon");
   return (
     <Pressable
       accessibilityRole="button"
@@ -166,9 +172,11 @@ function TerritoryRow({
       accessibilityHint={
         unlocked
           ? t("territories.selectHint", { territory: name })
-          : t("territories.purchaseHint", { territory: name })
+          : purchasable
+            ? t("territories.purchaseHint", { territory: name })
+            : t("territories.unavailableHint", { territory: name })
       }
-      disabled={selected || busy}
+      disabled={selected || busy || (!unlocked && !purchasable)}
       onPress={onPress}
       style={[
         styles.row,
@@ -205,7 +213,9 @@ function TerritoryRow({
             ? t("territories.included")
             : unlocked
               ? t("territories.purchased")
-              : t("territories.features")}
+              : purchasable
+                ? t("territories.features")
+                : t("territories.comingSoon")}
         </Text>
       </View>
       <View
@@ -214,16 +224,29 @@ function TerritoryRow({
           styles.action,
           {
             backgroundColor:
-              selected || unlocked ? theme.accentSoft : theme.accent,
+              selected || unlocked || !purchasable
+                ? theme.accentSoft
+                : theme.accent,
             opacity:
-              selected || busy || (!unlocked && !connected) ? 0.58 : 1,
+              selected ||
+              busy ||
+              (!unlocked && (!connected || !purchasable))
+                ? 0.58
+                : 1,
           },
         ]}
       >
         <Text
           style={[
             styles.actionText,
-            { color: selected || unlocked ? theme.accent : "#ffffff" },
+            {
+              color:
+                selected || unlocked
+                  ? theme.accent
+                  : !purchasable
+                    ? theme.textMuted
+                    : "#ffffff",
+            },
           ]}
         >
           {actionLabel}

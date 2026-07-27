@@ -40,6 +40,7 @@ interface TerritoryContextValue {
   storeError: string | null;
   storeMessage: string | null;
   isUnlocked: (territory: Territory) => boolean;
+  isPurchasable: (territory: Territory) => boolean;
   displayPrice: (territory: Territory) => string;
   purchaseToken: (territory: Territory) => string | null;
   selectTerritory: (territory: Territory) => Promise<boolean>;
@@ -246,10 +247,36 @@ export function TerritoryProvider({ children }: { children: ReactNode }) {
     [unlockedTerritoryIds],
   );
 
+  const isPurchasable = useCallback(
+    (territory: Territory) =>
+      Boolean(
+        !territory.free &&
+          territory.productId &&
+          productById.has(territory.productId),
+      ),
+    [productById],
+  );
+
+  const visibleTerritories = useMemo(
+    () =>
+      TERRITORIES.filter(
+        (territory) =>
+          territory.free ||
+          unlockedTerritoryIds.has(territory.id) ||
+          Boolean(
+            territory.productId && productById.has(territory.productId),
+          ),
+      ),
+    [productById, unlockedTerritoryIds],
+  );
+
   const displayPrice = useCallback(
     (territory: Territory) => {
       if (territory.free) return t("store.free");
-      return productById.get(territory.productId ?? "")?.displayPrice ?? "CHF 5";
+      return (
+        productById.get(territory.productId ?? "")?.displayPrice ??
+        t("territories.comingSoon")
+      );
     },
     [productById, t],
   );
@@ -311,9 +338,8 @@ export function TerritoryProvider({ children }: { children: ReactNode }) {
             territory: localizedName,
           });
           setIsPurchasing(false);
-          setStoreMessage(null);
-          setStoreError(message);
-          Alert.alert(t("store.unavailableTitle"), message);
+          setStoreMessage(message);
+          setStoreError(null);
           return;
         }
         setStoreMessage(null);
@@ -365,7 +391,7 @@ export function TerritoryProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<TerritoryContextValue>(
     () => ({
-      territories: TERRITORIES,
+      territories: visibleTerritories,
       activeTerritory,
       unlockedTerritoryIds,
       connected,
@@ -374,6 +400,7 @@ export function TerritoryProvider({ children }: { children: ReactNode }) {
       storeError,
       storeMessage,
       isUnlocked,
+      isPurchasable,
       displayPrice,
       purchaseToken,
       selectTerritory,
@@ -385,6 +412,7 @@ export function TerritoryProvider({ children }: { children: ReactNode }) {
       connected,
       displayPrice,
       isPurchasing,
+      isPurchasable,
       isUnlocked,
       purchaseTerritory,
       purchaseToken,
@@ -395,6 +423,7 @@ export function TerritoryProvider({ children }: { children: ReactNode }) {
       storeLoaded,
       storeMessage,
       unlockedTerritoryIds,
+      visibleTerritories,
     ],
   );
 
