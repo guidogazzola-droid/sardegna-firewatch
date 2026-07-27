@@ -18,3 +18,37 @@ test("the iOS build pins the expo-iap release with the fixed Apple request bridg
     "4.7.1",
   );
 });
+
+test("the mobile StoreKit catalog requests only the configured Switzerland product", () => {
+  const territorySource = readFileSync(
+    new URL("../mobile/src/lib/territories.ts", import.meta.url),
+    "utf8",
+  );
+  const contextSource = readFileSync(
+    new URL("../mobile/src/context/territory.tsx", import.meta.url),
+    "utf8",
+  );
+  const screenSource = readFileSync(
+    new URL("../mobile/app/(tabs)/territories.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(
+    territorySource,
+    /CONFIGURED_COUNTRY_PRODUCT_IDS\s*=\s*\[\s*"com\.guidogazzola\.sardiniafirewatch\.country\.ch",?\s*\]/,
+  );
+  assert.match(
+    contextSource,
+    /skus:\s*\[\.\.\.CONFIGURED_COUNTRY_PRODUCT_IDS\]/,
+  );
+  assert.doesNotMatch(
+    contextSource,
+    /skus:\s*COUNTRY_PRODUCT_IDS/,
+  );
+  assert.match(
+    contextSource,
+    /CONFIGURED_PRODUCT_ID_SET\.has\(territory\.productId\)/,
+  );
+  assert.match(screenSource, /t\("territories\.retry"\)/);
+  assert.match(screenSource, /StoreDiagnosticCard/);
+});

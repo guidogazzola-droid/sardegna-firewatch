@@ -2,6 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   fetchProducts as fetchStoreProducts,
   finishTransaction,
+  getStorefront,
   isTransactionVerifiedIOS,
   type Product,
   type Purchase,
@@ -19,7 +20,7 @@ import {
 import { Alert, Platform } from "react-native";
 import { translate, useI18n, type AppLanguage } from "../i18n";
 import {
-  COUNTRY_PRODUCT_IDS,
+  CONFIGURED_COUNTRY_PRODUCT_IDS,
   DEFAULT_TERRITORY,
   getTerritory,
   getTerritoryByProductId,
@@ -29,6 +30,18 @@ import {
 
 const ACTIVE_TERRITORY_KEY = "sabetta-piro-active-territory-v1";
 const ENTITLEMENTS_KEY = "sabetta-piro-country-entitlements-v1";
+const CONFIGURED_PRODUCT_ID_SET = new Set<string>(
+  CONFIGURED_COUNTRY_PRODUCT_IDS,
+);
+
+export interface StoreDiagnostics {
+  storefront: string | null;
+  requestedProductIds: readonly string[];
+  returnedProductIds: readonly string[];
+  errorCode: string | null;
+  errorMessage: string | null;
+  checkedAt: number | null;
+}
 
 interface TerritoryContextValue {
   territories: Territory[];
@@ -39,12 +52,15 @@ interface TerritoryContextValue {
   isPurchasing: boolean;
   storeError: string | null;
   storeMessage: string | null;
+  storeDiagnostics: StoreDiagnostics;
+  configuredProductMissing: boolean;
   isUnlocked: (territory: Territory) => boolean;
   isPurchasable: (territory: Territory) => boolean;
   displayPrice: (territory: Territory) => string;
   purchaseToken: (territory: Territory) => string | null;
   selectTerritory: (territory: Territory) => Promise<boolean>;
   purchaseTerritory: (territory: Territory) => Promise<void>;
+  refreshStoreCatalog: () => Promise<void>;
   restoreCountryPurchases: () => Promise<void>;
 }
 
@@ -76,6 +92,18 @@ function readableStoreError(
     : translate("store.unavailable", {}, language);
 }
 
+function storeErrorCode(error: unknown): string | null {
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    error.code
+  ) {
+    return String(error.code);
+  }
+  return null;
+}
+
 export function TerritoryProvider({ children }: { children: ReactNode }) {
   const { language, t, territoryName } = useI18n();
   const [activeTerritoryId, setActiveTerritoryId] = useState(
@@ -88,9 +116,15 @@ export function TerritoryProvider({ children }: { children: ReactNode }) {
   const [storeError, setStoreError] = useState<string | null>(null);
   const [storeMessage, setStoreMessage] = useState<string | null>(null);
   const [recentPurchases, setRecentPurchases] = useState<Purchase[]>([]);
-  const [productsFetchedOnDemand, setProductsFetchedOnDemand] = useState<
-    Product[]
-  >([]);
+  const [storeProducts, setStoreProducts] = useState<Product[]>([]);
+  const [storeDiagnostics, setStoreDiagnostics] = useState<StoreDiagnostics>({
+    storefront: null,
+    requestedProductIds: CONFIGURED_COUNTRY_PRODUCT_IDS,
+    returnedProductIds: [],
+    errorCode: null,
+    errorMessage: null,
+    checkedAt: null,
+  });
 
   const handlePurchaseSuccess = useCallback(async (purchase: Purchase) => {
     const territory = getTerritoryByProductId(purchase.productId);
@@ -133,9 +167,7 @@ export function TerritoryProvider({ children }: { children: ReactNode }) {
 
   const {
     connected,
-    products,
     availablePurchases,
-    fetchProducts: refreshProducts,
     getAvailablePurchases,
     requestPurchase,
     restorePurchases,
@@ -144,6 +176,71 @@ export function TerritoryProvider({ children }: { children: ReactNode }) {
     onPurchaseError: handlePurchaseError,
     onError: (error) => setStoreError(readableStoreError(error, language)),
   });
+
+  const fetchConfiguredProducts = useCallback(async () => {
+    let storefront: string | null = null;
+    let storefrontError: unknown = null;
+    if (Platform.OS === "ios") {
+      try {
+        storefront = await getStorefront();
+      } catch (error) {
+        storefrontError = error;
+      }
+    }
+
+    try {
+      const fetched = ((await fetchStoreProducts({
+        skus: [...CONFIGURED_COUNTRY_PRODUCT_IDS],
+        type: "in-app",
+      })) ?? []) as Product[];
+      setStoreProducts(fetched);
+      setStoreDiagnostics({
+        storefront,
+        requestedProductIds: CONFIGURED_COUNTRY_PRODUCT_IDS,
+        returnedProductIds: fetched.map((product) => product.id),
+        errorCode: storefrontError ? storeErrorCode(storefrontError) : null,
+        errorMessage: storefrontError
+          ? readableStoreError(storefrontError, language)
+          : null,
+        checkedAt: Date.now(),
+      });
+      return fetched;
+    } catch (error) {
+      setStoreProducts([]);
+      setStoreDiagnostics({
+        storefront,
+        requestedProductIds: CONFIGURED_COUNTRY_PRODUCT_IDS,
+        returnedProductIds: [],
+        errorCode: storeErrorCode(error),
+        errorMessage: readableStoreError(error, language),
+        checkedAt: Date.now(),
+      });
+      throw error;
+    }
+  }, [language]);
+
+  const refreshStoreCatalog = useCallback(async () => {
+    if (!connected) {
+      const message = t("store.notConnectedShort");
+      setStoreError(message);
+      setStoreDiagnostics((current) => ({
+        ...current,
+        errorCode: "not-connected",
+        errorMessage: message,
+        checkedAt: Date.now(),
+      }));
+      return;
+    }
+    setStoreLoaded(false);
+    setStoreError(null);
+    try {
+      await fetchConfiguredProducts();
+    } catch (error) {
+      setStoreError(readableStoreError(error, language));
+    } finally {
+      setStoreLoaded(true);
+    }
+  }, [connected, fetchConfiguredProducts, language, t]);
 
   useEffect(() => {
     void Promise.all([
@@ -179,13 +276,15 @@ export function TerritoryProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!connected) return;
-    void Promise.all([
-      refreshProducts({ skus: COUNTRY_PRODUCT_IDS, type: "in-app" }),
-      getAvailablePurchases(),
-    ])
+    void Promise.all([refreshStoreCatalog(), getAvailablePurchases()])
       .catch((error) => setStoreError(readableStoreError(error, language)))
       .finally(() => setStoreLoaded(true));
-  }, [connected, getAvailablePurchases, language, refreshProducts]);
+  }, [
+    connected,
+    getAvailablePurchases,
+    language,
+    refreshStoreCatalog,
+  ]);
 
   const storeEntitlements = useMemo(
     () =>
@@ -225,11 +324,9 @@ export function TerritoryProvider({ children }: { children: ReactNode }) {
   const productById = useMemo(
     () =>
       new Map(
-        products
-          .concat(productsFetchedOnDemand)
-          .map((product) => [product.id, product]),
+        storeProducts.map((product) => [product.id, product]),
       ),
-    [products, productsFetchedOnDemand],
+    [storeProducts],
   );
   const purchaseByProductId = useMemo(
     () =>
@@ -264,11 +361,18 @@ export function TerritoryProvider({ children }: { children: ReactNode }) {
           territory.free ||
           unlockedTerritoryIds.has(territory.id) ||
           Boolean(
-            territory.productId && productById.has(territory.productId),
+            territory.productId &&
+              CONFIGURED_PRODUCT_ID_SET.has(territory.productId),
           ),
       ),
-    [productById, unlockedTerritoryIds],
+    [unlockedTerritoryIds],
   );
+
+  const configuredProductMissing =
+    storeLoaded &&
+    CONFIGURED_COUNTRY_PRODUCT_IDS.some(
+      (productId) => !productById.has(productId),
+    );
 
   const displayPrice = useCallback(
     (territory: Territory) => {
@@ -318,20 +422,11 @@ export function TerritoryProvider({ children }: { children: ReactNode }) {
       try {
         let product = productById.get(territory.productId);
         if (!product) {
-          const fetched = ((await fetchStoreProducts({
-            skus: [territory.productId],
-            type: "in-app",
-          })) ?? []) as Product[];
+          const fetched = await fetchConfiguredProducts();
           const fetchedProduct = fetched.find(
             (item) => item.id === territory.productId,
           );
           product = fetchedProduct;
-          if (fetchedProduct) {
-            setProductsFetchedOnDemand((current) => [
-              ...current.filter((item) => item.id !== fetchedProduct.id),
-              fetchedProduct,
-            ]);
-          }
         }
         if (!product) {
           const message = t("store.productPending", {
@@ -362,6 +457,7 @@ export function TerritoryProvider({ children }: { children: ReactNode }) {
     },
     [
       connected,
+      fetchConfiguredProducts,
       isPurchasing,
       language,
       productById,
@@ -399,27 +495,33 @@ export function TerritoryProvider({ children }: { children: ReactNode }) {
       isPurchasing,
       storeError,
       storeMessage,
+      storeDiagnostics,
+      configuredProductMissing,
       isUnlocked,
       isPurchasable,
       displayPrice,
       purchaseToken,
       selectTerritory,
       purchaseTerritory,
+      refreshStoreCatalog,
       restoreCountryPurchases,
     }),
     [
       activeTerritory,
       connected,
       displayPrice,
+      configuredProductMissing,
       isPurchasing,
       isPurchasable,
       isUnlocked,
       purchaseTerritory,
       purchaseToken,
+      refreshStoreCatalog,
       restoreCountryPurchases,
       selectTerritory,
       storageLoaded,
       storeError,
+      storeDiagnostics,
       storeLoaded,
       storeMessage,
       unlockedTerritoryIds,
