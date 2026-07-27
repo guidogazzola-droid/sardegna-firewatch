@@ -23,11 +23,14 @@ export default function TerritoriesScreen() {
     isPurchasing,
     storeError,
     storeMessage,
+    storeDiagnostics,
+    configuredProductMissing,
     isUnlocked,
     isPurchasable,
     displayPrice,
     selectTerritory,
     purchaseTerritory,
+    refreshStoreCatalog,
     restoreCountryPurchases,
   } = useTerritory();
 
@@ -85,6 +88,18 @@ export default function TerritoriesScreen() {
                 {storeMessage}
               </Text>
             ) : null}
+            {configuredProductMissing ? (
+              <StoreDiagnosticCard
+                connected={connected}
+                busy={isLoading || isPurchasing}
+                storefront={storeDiagnostics.storefront}
+                productIds={storeDiagnostics.requestedProductIds}
+                returnedCount={storeDiagnostics.returnedProductIds.length}
+                errorCode={storeDiagnostics.errorCode}
+                errorMessage={storeDiagnostics.errorMessage}
+                onRetry={() => void refreshStoreCatalog()}
+              />
+            ) : null}
           </View>
         }
         renderItem={({ item }) => (
@@ -94,7 +109,7 @@ export default function TerritoriesScreen() {
             unlocked={isUnlocked(item)}
             purchasable={isPurchasable(item)}
             price={displayPrice(item)}
-            busy={isPurchasing}
+            busy={isLoading || isPurchasing}
             connected={connected}
             onPress={() =>
               void (isUnlocked(item)
@@ -164,7 +179,7 @@ function TerritoryRow({
       ? t("territories.open")
       : purchasable
         ? price
-        : t("territories.comingSoon");
+        : t("territories.retry");
   return (
     <Pressable
       accessibilityRole="button"
@@ -174,9 +189,9 @@ function TerritoryRow({
           ? t("territories.selectHint", { territory: name })
           : purchasable
             ? t("territories.purchaseHint", { territory: name })
-            : t("territories.unavailableHint", { territory: name })
+            : t("territories.retryHint", { territory: name })
       }
-      disabled={selected || busy || (!unlocked && !purchasable)}
+      disabled={selected || busy || (!unlocked && !connected)}
       onPress={onPress}
       style={[
         styles.row,
@@ -215,7 +230,7 @@ function TerritoryRow({
               ? t("territories.purchased")
               : purchasable
                 ? t("territories.features")
-                : t("territories.comingSoon")}
+                : t("territories.storePending")}
         </Text>
       </View>
       <View
@@ -224,13 +239,11 @@ function TerritoryRow({
           styles.action,
           {
             backgroundColor:
-              selected || unlocked || !purchasable
-                ? theme.accentSoft
-                : theme.accent,
+              selected || unlocked ? theme.accentSoft : theme.accent,
             opacity:
               selected ||
               busy ||
-              (!unlocked && (!connected || !purchasable))
+              (!unlocked && !connected)
                 ? 0.58
                 : 1,
           },
@@ -243,9 +256,7 @@ function TerritoryRow({
               color:
                 selected || unlocked
                   ? theme.accent
-                  : !purchasable
-                    ? theme.textMuted
-                    : "#ffffff",
+                  : "#ffffff",
             },
           ]}
         >
@@ -253,6 +264,101 @@ function TerritoryRow({
         </Text>
       </View>
     </Pressable>
+  );
+}
+
+function StoreDiagnosticCard({
+  connected,
+  busy,
+  storefront,
+  productIds,
+  returnedCount,
+  errorCode,
+  errorMessage,
+  onRetry,
+}: {
+  connected: boolean;
+  busy: boolean;
+  storefront: string | null;
+  productIds: readonly string[];
+  returnedCount: number;
+  errorCode: string | null;
+  errorMessage: string | null;
+  onRetry: () => void;
+}) {
+  const theme = useAppTheme();
+  const { t } = useI18n();
+  const error =
+    [errorCode, errorMessage].filter(Boolean).join(" · ") ||
+    t("territories.diagnosticNoError");
+  return (
+    <View
+      style={[
+        styles.diagnosticCard,
+        {
+          backgroundColor: theme.surface,
+          borderColor: `${theme.danger}66`,
+        },
+      ]}
+    >
+      <Text style={[styles.diagnosticTitle, { color: theme.danger }]}>
+        {t("territories.diagnosticTitle")}
+      </Text>
+      <Text style={[styles.diagnosticBody, { color: theme.textMuted }]}>
+        {t("territories.diagnosticBody")}
+      </Text>
+      <View style={styles.diagnosticDetails}>
+        <Text style={[styles.diagnosticLine, { color: theme.textMuted }]}>
+          {t("territories.diagnosticConnection", {
+            status: connected
+              ? t("territories.diagnosticConnected")
+              : t("territories.diagnosticDisconnected"),
+          })}
+        </Text>
+        <Text style={[styles.diagnosticLine, { color: theme.textMuted }]}>
+          {t("territories.diagnosticStorefront", {
+            storefront:
+              storefront ?? t("territories.diagnosticUnknown"),
+          })}
+        </Text>
+        <Text
+          selectable
+          style={[styles.diagnosticLine, { color: theme.textMuted }]}
+        >
+          {t("territories.diagnosticProduct", {
+            productId: productIds.join(", "),
+          })}
+        </Text>
+        <Text style={[styles.diagnosticLine, { color: theme.textMuted }]}>
+          {t("territories.diagnosticResponse", {
+            count: returnedCount,
+          })}
+        </Text>
+        <Text style={[styles.diagnosticLine, { color: theme.textMuted }]}>
+          {t("territories.diagnosticError", { error })}
+        </Text>
+      </View>
+      <Pressable
+        accessibilityRole="button"
+        disabled={!connected || busy}
+        onPress={onRetry}
+        style={[
+          styles.retryButton,
+          {
+            backgroundColor: theme.accent,
+            opacity: !connected || busy ? 0.55 : 1,
+          },
+        ]}
+      >
+        {busy ? (
+          <ActivityIndicator color="#ffffff" />
+        ) : (
+          <Text style={styles.retryText}>
+            {t("territories.retry")}
+          </Text>
+        )}
+      </Pressable>
+    </View>
   );
 }
 
@@ -274,6 +380,24 @@ const styles = StyleSheet.create({
   },
   modelTitle: { fontSize: 15, fontWeight: "900" },
   modelText: { fontSize: 12, lineHeight: 18 },
+  diagnosticCard: {
+    borderRadius: 18,
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: spacing.lg,
+    gap: spacing.sm,
+  },
+  diagnosticTitle: { fontSize: 14, fontWeight: "900" },
+  diagnosticBody: { fontSize: 11, lineHeight: 16 },
+  diagnosticDetails: { gap: 3 },
+  diagnosticLine: { fontSize: 10, lineHeight: 15 },
+  retryButton: {
+    minHeight: 42,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: spacing.xs,
+  },
+  retryText: { color: "#ffffff", fontSize: 12, fontWeight: "900" },
   storeStatus: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   storeStatusText: { fontSize: 12, fontWeight: "600" },
   message: { fontSize: 12, lineHeight: 18, fontWeight: "700" },
