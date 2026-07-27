@@ -1,6 +1,6 @@
 name: Build and submit iOS to TestFlight
 
-# Production trigger: Apple IAP review fix, 2026-07-27
+# TestFlight diagnostic build 16 trigger, 2026-07-27
 
 on:
   workflow_dispatch:
