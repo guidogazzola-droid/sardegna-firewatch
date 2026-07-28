@@ -19,7 +19,7 @@ test("the iOS build pins the expo-iap release with the fixed Apple request bridg
   );
 });
 
-test("the mobile StoreKit catalog requests only the configured Switzerland product", () => {
+test("the mobile StoreKit catalog requests every configured country product", () => {
   const territorySource = readFileSync(
     new URL("../mobile/src/lib/territories.ts", import.meta.url),
     "utf8",
@@ -35,7 +35,7 @@ test("the mobile StoreKit catalog requests only the configured Switzerland produ
 
   assert.match(
     territorySource,
-    /CONFIGURED_COUNTRY_PRODUCT_IDS\s*=\s*\[\s*"com\.guidogazzola\.sardiniafirewatch\.country\.ch",?\s*\]/,
+    /CONFIGURED_COUNTRY_PRODUCT_IDS\s*=\s*COUNTRY_PRODUCT_IDS/,
   );
   assert.match(
     contextSource,
