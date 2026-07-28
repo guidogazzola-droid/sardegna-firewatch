@@ -44,12 +44,9 @@ export const COUNTRY_PRODUCT_IDS = TERRITORIES.flatMap((territory) =>
   territory.productId ? [territory.productId] : [],
 );
 
-// Keep this list aligned with the products that actually exist in App Store
-// Connect. The full territory catalog remains available for future products,
-// but StoreKit must only be queried with configured product identifiers.
-export const CONFIGURED_COUNTRY_PRODUCT_IDS = [
-  "com.guidogazzola.sardiniafirewatch.country.ch",
-] as const;
+// Every paid-territory product is configured in App Store Connect.
+// StoreKit still returns only products available in the current storefront.
+export const CONFIGURED_COUNTRY_PRODUCT_IDS = COUNTRY_PRODUCT_IDS;
 
 export function getTerritory(territoryId: string): Territory | null {
   return TERRITORY_BY_ID.get(territoryId) ?? null;
