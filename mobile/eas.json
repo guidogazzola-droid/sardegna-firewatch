@@ -16,6 +16,11 @@
     "production": {
       "autoIncrement": true,
       "environment": "production"
+    },
+    "local-production": {
+      "extends": "production",
+      "autoIncrement": false,
+      "environment": "production"
     }
   },
   "submit": {
