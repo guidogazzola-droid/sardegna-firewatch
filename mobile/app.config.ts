@@ -28,7 +28,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   slug: "sardinia-firewatch",
   owner: "camerun",
   scheme: "sardiniafirewatch",
-  version: "0.3.0",
+  version: "1.1.0",
   icon: "./assets/images/icon.png",
   orientation: "portrait",
   userInterfaceStyle: "automatic",

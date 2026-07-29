@@ -1,6 +1,6 @@
 name: Build and submit iOS to TestFlight
 
-# TestFlight full country catalog build 17 trigger, 2026-07-29
+# SabettaPiro 1.1.0 build 18 TestFlight trigger, 2026-07-29
 
 on:
   workflow_dispatch:

@@ -12,7 +12,7 @@ export const APP_DISPLAY_NAME = configuredText(
   "SabettaPiro \u2014 Wildfire Alerts",
 );
 
-export const APP_VERSION = "0.3.0";
+export const APP_VERSION = "1.1.0";
 
 export const API_BASE_URL = withoutTrailingSlash(
   process.env.EXPO_PUBLIC_API_BASE_URL ?? "https://sardegna-firewatch.onrender.com",
